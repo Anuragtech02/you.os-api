@@ -120,13 +120,13 @@ export interface CoreAttributes {
 
 export interface AestheticState {
   colorPalette?: {
-    primary: string
-    secondary: string[]
-    accents: string[]
-    neutrals: string[]
-    avoid: string[]
-    season: 'spring' | 'summer' | 'autumn' | 'winter'
-    undertone: 'warm' | 'cool' | 'neutral'
+    primary?: string
+    secondary?: string[]
+    accents?: string[]
+    neutrals?: string[]
+    avoid?: string[]
+    season?: 'spring' | 'summer' | 'autumn' | 'winter'
+    undertone?: 'warm' | 'cool' | 'neutral'
   }
   styleArchetype?: string
   hairSuggestions?: string[]
