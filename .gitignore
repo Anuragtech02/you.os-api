@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+*.tgz
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Drizzle migrations (generated)
+drizzle/
+
+# Supabase
+.supabase/
+
+# IDE
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Testing
+coverage/
+*.lcov
+
+# Temp/Cache
+tmp/
+temp/
+.cache/
+*.tsbuildinfo
+.eslintcache

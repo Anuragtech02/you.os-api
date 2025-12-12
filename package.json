@@ -1,0 +1,41 @@
+{
+  "name": "youos-api",
+  "version": "0.1.0",
+  "description": "YOU.OS API - AI-powered Identity Operating System backend",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "build": "bun build src/index.ts --outdir=dist --target=bun",
+    "lint": "biome check --write .",
+    "format": "biome format --write .",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.8",
+    "@types/bun": "latest",
+    "drizzle-kit": "^0.31.8",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/cors": "^11.2.0",
+    "@fastify/rate-limit": "^10.3.0",
+    "@google/generative-ai": "^0.24.1",
+    "@supabase/supabase-js": "^2.87.1",
+    "drizzle-orm": "^0.45.1",
+    "fastify": "^5.6.2",
+    "fastify-plugin": "^5.1.0",
+    "nanoid": "^5.1.6",
+    "openai": "^6.10.0",
+    "pino-pretty": "^13.1.3",
+    "postgres": "^3.4.7",
+    "zod": "^4.1.13"
+  }
+}
