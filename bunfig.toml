@@ -1,0 +1,10 @@
+# Bun configuration
+# https://bun.sh/docs/runtime/bunfig
+
+[test]
+# Test files pattern
+preload = ["./tests/setup.ts"]
+
+# Coverage configuration
+coverage = true
+coverageDir = "./coverage"

@@ -6,7 +6,7 @@ import { env } from '@/config/env'
 import { db } from '@/db/client'
 import { users } from '@/db/schema'
 import type { AuthenticatedUser } from '@/types'
-import { ErrorCodes, sendError } from '@/utils/response'
+import { Errors } from '@/utils/errors'
 
 // Create Supabase client for auth
 const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
@@ -16,16 +16,12 @@ async function authPlugin(fastify: FastifyInstance) {
   fastify.decorateRequest('user', undefined)
 
   // Authentication hook - extracts and validates JWT
-  fastify.decorate('authenticate', async (request: FastifyRequest, reply: FastifyReply) => {
+  // Throws ApiError on failure, which Fastify's error handler will catch
+  fastify.decorate('authenticate', async (request: FastifyRequest, _reply: FastifyReply) => {
     const authHeader = request.headers.authorization
 
     if (!authHeader?.startsWith('Bearer ')) {
-      return sendError(
-        reply,
-        ErrorCodes.UNAUTHORIZED,
-        'Missing or invalid authorization header',
-        401
-      )
+      throw Errors.unauthorized('Missing or invalid authorization header')
     }
 
     const token = authHeader.substring(7)
@@ -38,18 +34,18 @@ async function authPlugin(fastify: FastifyInstance) {
       } = await supabase.auth.getUser(token)
 
       if (error || !authUser) {
-        return sendError(reply, ErrorCodes.INVALID_TOKEN, 'Invalid or expired token', 401)
+        throw Errors.invalidToken()
       }
 
       // Get user from our database
       const [dbUser] = await db.select().from(users).where(eq(users.authId, authUser.id)).limit(1)
 
       if (!dbUser) {
-        return sendError(reply, ErrorCodes.USER_NOT_FOUND, 'User not found in database', 404)
+        throw Errors.userNotFound()
       }
 
       if (!dbUser.isActive) {
-        return sendError(reply, ErrorCodes.FORBIDDEN, 'User account is deactivated', 403)
+        throw Errors.forbidden('User account is deactivated')
       }
 
       // Attach user to request
@@ -61,8 +57,13 @@ async function authPlugin(fastify: FastifyInstance) {
         companyId: dbUser.companyId ?? undefined,
       } satisfies AuthenticatedUser
     } catch (err) {
+      // Re-throw ApiErrors as-is
+      if (err instanceof Error && err.name === 'ApiError') {
+        throw err
+      }
+      // Log and wrap other errors
       fastify.log.error(err, 'Authentication error')
-      return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Authentication failed', 500)
+      throw Errors.internal('Authentication failed')
     }
   })
 
@@ -100,13 +101,13 @@ async function authPlugin(fastify: FastifyInstance) {
   })
 
   // Company admin check
-  fastify.decorate('requireCompanyAdmin', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.decorate('requireCompanyAdmin', async (request: FastifyRequest, _reply: FastifyReply) => {
     if (!request.user) {
-      return sendError(reply, ErrorCodes.UNAUTHORIZED, 'Authentication required', 401)
+      throw Errors.unauthorized('Authentication required')
     }
 
     if (request.user.accountType !== 'company' || !request.user.companyId) {
-      return sendError(reply, ErrorCodes.FORBIDDEN, 'Company account required', 403)
+      throw Errors.forbidden('Company account required')
     }
 
     // TODO: Check if user is admin of the company

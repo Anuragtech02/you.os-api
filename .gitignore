@@ -37,6 +37,7 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # Testing
 coverage/
 *.lcov
+.nyc_output/
 
 # Temp/Cache
 tmp/
