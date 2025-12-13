@@ -33,6 +33,7 @@ export interface ApiError {
 export interface ResponseMeta {
   page?: number
   limit?: number
+  offset?: number
   total?: number
   hasMore?: boolean
 }

@@ -29,7 +29,9 @@
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.2.0",
+    "@fastify/multipart": "^9.3.0",
     "@fastify/rate-limit": "^10.3.0",
+    "@google/genai": "^1.33.0",
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.87.1",
     "drizzle-orm": "^0.45.1",

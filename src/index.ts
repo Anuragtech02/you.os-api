@@ -1,4 +1,5 @@
 import Fastify from 'fastify'
+import multipart from '@fastify/multipart'
 import { env } from '@/config/env'
 import { authPlugin, corsPlugin, rateLimitPlugin } from '@/plugins'
 import { registerRoutes } from '@/routes'
@@ -30,6 +31,13 @@ async function registerPlugins() {
   await fastify.register(corsPlugin)
   await fastify.register(rateLimitPlugin)
   await fastify.register(authPlugin)
+  // Multipart for file uploads (10MB limit)
+  await fastify.register(multipart, {
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB
+      files: 1,
+    },
+  })
 }
 
 // Register routes

@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify'
 import { API_PREFIX } from '@/config/constants'
 import { authRoutes } from './auth'
+import { bioRoutes } from './bios'
 import { healthRoutes } from './health'
 import { identityBrainRoutes } from './identity-brain'
+import { photoRoutes } from './photos'
 
 export async function registerRoutes(fastify: FastifyInstance) {
   // Health routes (no prefix)
@@ -17,9 +19,13 @@ export async function registerRoutes(fastify: FastifyInstance) {
       // Identity Brain routes
       await api.register(identityBrainRoutes, { prefix: '/identity-brain' })
 
+      // Photo routes
+      await api.register(photoRoutes, { prefix: '/photos' })
+
+      // Bio Generator routes
+      await api.register(bioRoutes, { prefix: '/bios' })
+
       // TODO: Register additional API route modules here
-      // await api.register(photoRoutes, { prefix: '/photos' })
-      // await api.register(contentRoutes, { prefix: '/content' })
       // await api.register(syncRoutes, { prefix: '/sync-all' })
       // await api.register(moduleRoutes, { prefix: '/modules' })
 
