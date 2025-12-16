@@ -4,10 +4,12 @@ import { aestheticRoutes } from './aesthetic'
 import { authRoutes } from './auth'
 import { bioRoutes } from './bios'
 import { careerRoutes } from './career'
+import { companyRoutes, inviteRoutes } from './companies'
 import { datingRoutes } from './dating'
 import { healthRoutes } from './health'
 import { identityBrainRoutes } from './identity-brain'
 import { photoRoutes } from './photos'
+import { syncAllRoutes } from './sync-all'
 
 export async function registerRoutes(fastify: FastifyInstance) {
   // Health routes (no prefix)
@@ -37,8 +39,14 @@ export async function registerRoutes(fastify: FastifyInstance) {
       // Aesthetic Module routes
       await api.register(aestheticRoutes, { prefix: '/aesthetic' })
 
-      // TODO: Register additional API route modules here
-      // await api.register(syncRoutes, { prefix: '/sync-all' })
+      // Sync-All routes
+      await api.register(syncAllRoutes, { prefix: '/sync-all' })
+
+      // Company routes
+      await api.register(companyRoutes, { prefix: '/companies' })
+
+      // Invite routes (public)
+      await api.register(inviteRoutes, { prefix: '/invites' })
 
       // Placeholder route
       api.get('/', async () => ({

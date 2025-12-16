@@ -63,6 +63,40 @@ export const companyCandidates = pgTable(
   ]
 )
 
+// Company Invites table
+export const companyInvites = pgTable(
+  'company_invites',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+
+    // Invite details
+    email: text('email').notNull(),
+    role: text('role').default('employee').notNull(), // 'admin', 'manager', 'employee'
+    token: text('token').notNull().unique(),
+
+    // Status
+    status: text('status').default('pending').notNull(), // pending, accepted, expired, revoked
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+
+    // Tracking
+    invitedBy: uuid('invited_by')
+      .notNull()
+      .references(() => users.id),
+    acceptedBy: uuid('accepted_by').references(() => users.id),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_company_invites_company').on(table.companyId),
+    index('idx_company_invites_token').on(table.token),
+    index('idx_company_invites_email').on(table.email),
+  ]
+)
+
 // Type definitions
 export interface BrandColors {
   primary?: string
@@ -90,3 +124,5 @@ export type Company = typeof companies.$inferSelect
 export type NewCompany = typeof companies.$inferInsert
 export type CompanyCandidate = typeof companyCandidates.$inferSelect
 export type NewCompanyCandidate = typeof companyCandidates.$inferInsert
+export type CompanyInvite = typeof companyInvites.$inferSelect
+export type NewCompanyInvite = typeof companyInvites.$inferInsert
