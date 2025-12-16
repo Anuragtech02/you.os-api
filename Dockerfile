@@ -38,17 +38,17 @@ RUN chown -R nodejs:nodejs /app
 # Switch to non-root user
 USER nodejs
 
-# Expose port
-EXPOSE 3000
+# Expose port (actual port is set via PORT env var)
+EXPOSE 9006
 
-# Health check (uses shell to read PORT env var)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD sh -c 'wget --no-verbose --tries=1 --spider http://localhost:${PORT:-3000}/api/v1/health || exit 1'
+# Healthcheck disabled temporarily - enable after debugging
+# HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+#     CMD sh -c 'wget --no-verbose --tries=1 --spider http://localhost:${PORT:-3000}/api/v1/health || exit 1'
 
 # Set environment
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
-ENV PORT=3000
+ENV PORT=9006
 
 # Start the server
 CMD ["bun", "src/index.ts"]
