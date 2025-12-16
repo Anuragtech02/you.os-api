@@ -1,0 +1,36 @@
+# Dependencies
+node_modules
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Build output
+dist
+
+# Test files
+tests
+*.test.ts
+coverage
+
+# Documentation
+*.md
+!README.md
+
+# Environment files (handle via Coolify)
+.env
+.env.local
+.env.*.local
+
+# Drizzle migrations (run separately)
+drizzle
+
+# Misc
+.DS_Store
+*.log

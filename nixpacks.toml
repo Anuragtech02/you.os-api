@@ -1,0 +1,19 @@
+# Nixpacks configuration for YOU.OS API
+# Alternative to Dockerfile for platforms that support Nixpacks
+# Note: Requires Nixpacks v1.36.0+ for Bun 1.2 support
+
+[phases.setup]
+nixPkgs = ["bun"]
+
+[phases.install]
+cmds = ["bun install --frozen-lockfile"]
+
+[phases.build]
+# No build step needed - Bun runs TypeScript directly
+cmds = []
+
+[start]
+cmd = "bun src/index.ts"
+
+[variables]
+NODE_ENV = "production"

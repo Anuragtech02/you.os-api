@@ -1,0 +1,50 @@
+# Docker Compose for local development and Coolify deployment
+# For Coolify: Deploy services individually or use this as reference
+
+version: '3.8'
+
+services:
+  # Supabase services via official Supabase Docker setup
+  # For Coolify, use Supabase template or self-host separately
+  # See: https://supabase.com/docs/guides/self-hosting/docker
+
+  # YOU.OS API Backend
+  youos-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: youos-api
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3000
+      - HOST=0.0.0.0
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - DATABASE_URL=${DATABASE_URL}
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - BANANA_API_KEY=${BANANA_API_KEY:-}
+      - SUPABASE_STORAGE_BUCKET=${SUPABASE_STORAGE_BUCKET:-photos}
+      - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-100}
+      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-60000}
+      - SYNC_COOLDOWN_MS=${SYNC_COOLDOWN_MS:-300000}
+      - SYNC_TIMEOUT_MS=${SYNC_TIMEOUT_MS:-60000}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - youos-network
+    # Depends on Supabase if running full stack locally
+    # depends_on:
+    #   - supabase-db
+
+networks:
+  youos-network:
+    driver: bridge
