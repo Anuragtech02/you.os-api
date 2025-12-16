@@ -43,7 +43,7 @@ EXPOSE 9006
 
 # Health check with longer start period for container initialization
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \
-    CMD sh -c 'wget --no-verbose --tries=1 --spider http://127.0.0.1:${PORT:-9006}/api/v1/health || exit 1'
+    CMD sh -c 'wget --no-verbose --tries=1 --spider http://localhost:${PORT:-9006}/api/v1/health || exit 1'
 
 # Set environment
 ENV NODE_ENV=production
