@@ -18,7 +18,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "bun scripts/seed.ts",
+    "db:reset": "bun scripts/reset.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.8",
