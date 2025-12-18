@@ -18,16 +18,21 @@ Run these in your Supabase SQL Editor:
 -- Enable RLS on all tables
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
-ALTER TABLE company_employees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE company_candidates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_invites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE identity_brains ENABLE ROW LEVEL SECURITY;
 ALTER TABLE identity_brain_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE personas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE photos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE generated_content ENABLE ROW LEVEL SECURITY;
-ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
+ALTER TABLE content_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sync_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sync_all_jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sync_jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feature_flags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE usage_metrics ENABLE ROW LEVEL SECURITY;
 ```
 
 ## User Policies
@@ -79,7 +84,7 @@ CREATE POLICY "Users can delete own identity brain"
 CREATE POLICY "Users can view own brain versions"
   ON identity_brain_versions FOR SELECT
   USING (
-    brain_id IN (
+    identity_brain_id IN (
       SELECT id FROM identity_brains WHERE user_id = auth.uid()::text
     )
   );
@@ -87,7 +92,7 @@ CREATE POLICY "Users can view own brain versions"
 CREATE POLICY "Users can create own brain versions"
   ON identity_brain_versions FOR INSERT
   WITH CHECK (
-    brain_id IN (
+    identity_brain_id IN (
       SELECT id FROM identity_brains WHERE user_id = auth.uid()::text
     )
   );
@@ -96,22 +101,38 @@ CREATE POLICY "Users can create own brain versions"
 ### Personas
 
 ```sql
--- Users can CRUD their own personas
+-- Users can CRUD personas belonging to their identity brain
 CREATE POLICY "Users can view own personas"
   ON personas FOR SELECT
-  USING (auth.uid()::text = user_id);
+  USING (
+    identity_brain_id IN (
+      SELECT id FROM identity_brains WHERE user_id = auth.uid()::text
+    )
+  );
 
 CREATE POLICY "Users can create own personas"
   ON personas FOR INSERT
-  WITH CHECK (auth.uid()::text = user_id);
+  WITH CHECK (
+    identity_brain_id IN (
+      SELECT id FROM identity_brains WHERE user_id = auth.uid()::text
+    )
+  );
 
 CREATE POLICY "Users can update own personas"
   ON personas FOR UPDATE
-  USING (auth.uid()::text = user_id);
+  USING (
+    identity_brain_id IN (
+      SELECT id FROM identity_brains WHERE user_id = auth.uid()::text
+    )
+  );
 
 CREATE POLICY "Users can delete own personas"
   ON personas FOR DELETE
-  USING (auth.uid()::text = user_id);
+  USING (
+    identity_brain_id IN (
+      SELECT id FROM identity_brains WHERE user_id = auth.uid()::text
+    )
+  );
 ```
 
 ### Photos
@@ -156,17 +177,25 @@ CREATE POLICY "Users can delete own content"
   USING (auth.uid()::text = user_id);
 ```
 
-### Feedback
+### Content Templates
 
 ```sql
--- Users can CRUD their own feedback
-CREATE POLICY "Users can view own feedback"
-  ON feedback FOR SELECT
+-- Users can CRUD their own content templates
+CREATE POLICY "Users can view own templates"
+  ON content_templates FOR SELECT
   USING (auth.uid()::text = user_id);
 
-CREATE POLICY "Users can create feedback"
-  ON feedback FOR INSERT
+CREATE POLICY "Users can create own templates"
+  ON content_templates FOR INSERT
   WITH CHECK (auth.uid()::text = user_id);
+
+CREATE POLICY "Users can update own templates"
+  ON content_templates FOR UPDATE
+  USING (auth.uid()::text = user_id);
+
+CREATE POLICY "Users can delete own templates"
+  ON content_templates FOR DELETE
+  USING (auth.uid()::text = user_id);
 ```
 
 ### Sync Events & Jobs
@@ -178,8 +207,55 @@ CREATE POLICY "Users can view own sync events"
   USING (auth.uid()::text = user_id);
 
 CREATE POLICY "Users can view own sync jobs"
-  ON sync_all_jobs FOR SELECT
+  ON sync_jobs FOR SELECT
   USING (auth.uid()::text = user_id);
+```
+
+### Admin Tables
+
+```sql
+-- Admin users table - only admins can view
+CREATE POLICY "Admins can view admin users"
+  ON admin_users FOR SELECT
+  USING (
+    auth.uid()::text IN (SELECT user_id FROM admin_users WHERE is_active = true)
+  );
+
+-- Audit logs - admins only
+CREATE POLICY "Admins can view audit logs"
+  ON audit_logs FOR SELECT
+  USING (
+    auth.uid()::text IN (SELECT user_id FROM admin_users WHERE is_active = true)
+  );
+
+-- System settings - public settings visible to all, others admin only
+CREATE POLICY "Anyone can view public settings"
+  ON system_settings FOR SELECT
+  USING (is_public = true);
+
+CREATE POLICY "Admins can view all settings"
+  ON system_settings FOR SELECT
+  USING (
+    auth.uid()::text IN (SELECT user_id FROM admin_users WHERE is_active = true)
+  );
+
+-- Feature flags - admins only for management
+CREATE POLICY "Admins can manage feature flags"
+  ON feature_flags FOR ALL
+  USING (
+    auth.uid()::text IN (SELECT user_id FROM admin_users WHERE is_active = true)
+  );
+
+-- Usage metrics - users see own, admins see all
+CREATE POLICY "Users can view own metrics"
+  ON usage_metrics FOR SELECT
+  USING (auth.uid()::text = user_id);
+
+CREATE POLICY "Admins can view all metrics"
+  ON usage_metrics FOR SELECT
+  USING (
+    auth.uid()::text IN (SELECT user_id FROM admin_users WHERE is_active = true)
+  );
 ```
 
 ## Company/Multi-Tenant Policies
@@ -192,7 +268,7 @@ CREATE POLICY "Company admins can view company"
   ON companies FOR SELECT
   USING (
     id IN (
-      SELECT company_id FROM company_employees
+      SELECT company_id FROM company_candidates
       WHERE user_id = auth.uid()::text AND role IN ('owner', 'admin')
     )
   );
@@ -201,36 +277,36 @@ CREATE POLICY "Company owners can update company"
   ON companies FOR UPDATE
   USING (
     id IN (
-      SELECT company_id FROM company_employees
+      SELECT company_id FROM company_candidates
       WHERE user_id = auth.uid()::text AND role = 'owner'
     )
   );
 ```
 
-### Company Employees
+### Company Candidates
 
 ```sql
--- Company admins can view employees
-CREATE POLICY "Company admins can view employees"
-  ON company_employees FOR SELECT
+-- Company admins can view candidates
+CREATE POLICY "Company admins can view candidates"
+  ON company_candidates FOR SELECT
   USING (
     company_id IN (
-      SELECT company_id FROM company_employees
+      SELECT company_id FROM company_candidates
       WHERE user_id = auth.uid()::text AND role IN ('owner', 'admin')
     )
   );
 
--- Users can view their own employee record
-CREATE POLICY "Users can view own employee record"
-  ON company_employees FOR SELECT
+-- Users can view their own candidate record
+CREATE POLICY "Users can view own candidate record"
+  ON company_candidates FOR SELECT
   USING (auth.uid()::text = user_id);
 
--- Company owners can manage employees
-CREATE POLICY "Company owners can manage employees"
-  ON company_employees FOR ALL
+-- Company owners can manage candidates
+CREATE POLICY "Company owners can manage candidates"
+  ON company_candidates FOR ALL
   USING (
     company_id IN (
-      SELECT company_id FROM company_employees
+      SELECT company_id FROM company_candidates
       WHERE user_id = auth.uid()::text AND role = 'owner'
     )
   );
@@ -244,7 +320,7 @@ CREATE POLICY "Company admins can view invites"
   ON company_invites FOR SELECT
   USING (
     company_id IN (
-      SELECT company_id FROM company_employees
+      SELECT company_id FROM company_candidates
       WHERE user_id = auth.uid()::text AND role IN ('owner', 'admin')
     )
   );
@@ -253,7 +329,7 @@ CREATE POLICY "Company admins can create invites"
   ON company_invites FOR INSERT
   WITH CHECK (
     company_id IN (
-      SELECT company_id FROM company_employees
+      SELECT company_id FROM company_candidates
       WHERE user_id = auth.uid()::text AND role IN ('owner', 'admin')
     )
   );
