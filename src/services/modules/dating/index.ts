@@ -17,6 +17,7 @@ import {
 } from '@/db/schema'
 import { Errors } from '@/utils/errors'
 import * as GeminiService from '../../ai/gemini'
+import type { VoiceNoteAnalysisResult } from '../../ai/gemini'
 import {
   buildCoachingTasksPrompt,
   buildConversationAnalysisPrompt,
@@ -745,6 +746,49 @@ function parseObjectResponse<T>(text: string): Partial<T> {
   } catch {
     console.error('Failed to parse object response')
     return {}
+  }
+}
+
+// ============================================
+// Voice Note Feedback
+// ============================================
+
+export interface VoiceNoteFeedbackResult extends VoiceNoteAnalysisResult {
+  // Additional dating-specific recommendations
+  datingTips: string[]
+}
+
+/**
+ * Analyze a voice note for dating profile optimization
+ */
+export async function analyzeVoiceNote(
+  audioData: string | Buffer,
+  mimeType = 'audio/mp3'
+): Promise<VoiceNoteFeedbackResult> {
+  const result = await GeminiService.analyzeVoiceNote(audioData, mimeType)
+
+  // Add dating-specific tips based on analysis
+  const datingTips: string[] = []
+
+  if (result.toneAnalysis.overall === 'nervous') {
+    datingTips.push('Try recording after taking a few deep breaths to sound more relaxed')
+  }
+  if (result.toneAnalysis.energy === 'low') {
+    datingTips.push('Add more enthusiasm - smile while recording to naturally lift your tone')
+  }
+  if (result.pacing.speed === 'fast') {
+    datingTips.push('Slow down slightly - it shows confidence and makes you easier to understand')
+  }
+  if (result.content.hookStrength < 50) {
+    datingTips.push('Start with something unique about yourself or an interesting question')
+  }
+  if (result.toneAnalysis.authenticity === 'rehearsed') {
+    datingTips.push('Try speaking more naturally - pretend you\'re talking to a friend')
+  }
+
+  return {
+    ...result,
+    datingTips,
   }
 }
 

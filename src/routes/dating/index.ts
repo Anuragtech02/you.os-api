@@ -379,6 +379,50 @@ export async function datingRoutes(fastify: FastifyInstance) {
   )
 
   // =========================================
+  // Voice Note Feedback
+  // =========================================
+
+  /**
+   * POST /dating/voice-note/analyze - Analyze a voice note for dating
+   */
+  fastify.post(
+    '/voice-note/analyze',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      try {
+        const data = await request.file()
+        if (!data) {
+          return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'No audio file uploaded', 400)
+        }
+
+        const buffer = await data.toBuffer()
+        const mimeType = data.mimetype || 'audio/mp3'
+
+        // Validate audio type
+        const allowedTypes = ['audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/m4a']
+        if (!allowedTypes.includes(mimeType)) {
+          return sendError(
+            reply,
+            ErrorCodes.VALIDATION_ERROR,
+            `Invalid audio type. Allowed: ${allowedTypes.join(', ')}`,
+            400
+          )
+        }
+
+        const result = await DatingService.analyzeVoiceNote(buffer, mimeType)
+
+        return sendSuccess(reply, result)
+      } catch (error) {
+        if (error instanceof ApiError) {
+          return sendError(reply, error.code, error.message, error.statusCode)
+        }
+        fastify.log.error(error, 'Voice note analysis error')
+        return sendError(reply, ErrorCodes.AI_SERVICE_ERROR, 'Failed to analyze voice note', 500)
+      }
+    }
+  )
+
+  // =========================================
   // Utilities
   // =========================================
 

@@ -7,15 +7,21 @@
  */
 
 import { GoogleGenAI } from '@google/genai'
+import OpenAI from 'openai'
 import { env } from '@/config/env'
 import { Errors } from '@/utils/errors'
+import { logger } from '@/utils/logger'
 
 // Initialize Google AI client
 const ai = new GoogleGenAI({ apiKey: env.GOOGLE_AI_API_KEY })
 
+// Initialize OpenAI client for fallback
+const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY })
+
 // Model configuration
 const ANALYSIS_MODEL = 'gemini-2.5-flash'
 const IMAGE_MODEL = 'gemini-2.5-flash-image'
+const FALLBACK_MODEL = 'gpt-5-mini' // GPT-5 Mini fallback for rate limits
 
 // Retry configuration
 const MAX_RETRIES = 3
@@ -433,7 +439,7 @@ export interface TextGenerationResult {
 }
 
 /**
- * Generate text content using Gemini 2.5 Flash
+ * Generate text content using Gemini 2.5 Flash with GPT-5 Mini fallback
  */
 export async function generateText(
   prompt: string,
@@ -445,23 +451,206 @@ export async function generateText(
 ): Promise<TextGenerationResult> {
   const { systemPrompt, temperature = 0.7, maxTokens = 2048 } = options
 
-  return withRetry(async () => {
-    const contents = systemPrompt
-      ? [{ text: `${systemPrompt}\n\n${prompt}` }]
-      : prompt
+  // Try Gemini first
+  try {
+    return await withRetry(async () => {
+      const contents = systemPrompt
+        ? [{ text: `${systemPrompt}\n\n${prompt}` }]
+        : prompt
 
+      const response = await ai.models.generateContent({
+        model: ANALYSIS_MODEL,
+        contents,
+        config: {
+          temperature,
+          maxOutputTokens: maxTokens,
+        },
+      })
+
+      return {
+        text: response.text ?? '',
+        model: ANALYSIS_MODEL,
+      }
+    })
+  } catch (geminiError) {
+    // Fallback to GPT-5 Mini if Gemini fails
+    logger.warn('Gemini failed, falling back to GPT-5 Mini', { error: String(geminiError) })
+
+    try {
+      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = []
+
+      if (systemPrompt) {
+        messages.push({ role: 'system', content: systemPrompt })
+      }
+      messages.push({ role: 'user', content: prompt })
+
+      const response = await openai.chat.completions.create({
+        model: FALLBACK_MODEL,
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+      })
+
+      return {
+        text: response.choices[0]?.message?.content ?? '',
+        model: FALLBACK_MODEL,
+        tokensUsed: response.usage?.total_tokens,
+      }
+    } catch (fallbackError) {
+      logger.error('GPT-5 Mini fallback also failed', fallbackError)
+      throw geminiError // Throw original error
+    }
+  }
+}
+
+// ============================================
+// Voice Note Analysis (for Dating Module)
+// ============================================
+
+export interface VoiceNoteAnalysisResult {
+  transcript: string
+  toneAnalysis: {
+    overall: string // 'confident', 'nervous', 'warm', 'monotone', etc.
+    energy: string // 'high', 'medium', 'low'
+    authenticity: string // 'genuine', 'rehearsed', 'natural'
+  }
+  pacing: {
+    speed: string // 'fast', 'moderate', 'slow'
+    pauseUsage: string // 'effective', 'too many', 'none'
+    clarity: number // 0-100
+  }
+  content: {
+    hookStrength: number // 0-100
+    personalityShown: string[]
+    improvements: string[]
+    strengths: string[]
+  }
+  overallScore: number // 0-100
+  suggestions: string[]
+  model: string
+}
+
+const VOICE_NOTE_ANALYSIS_PROMPT = `Analyze this voice note/audio recording for a dating app profile.
+
+Provide a JSON response with the following structure:
+{
+  "transcript": "Full transcript of what was said",
+  "toneAnalysis": {
+    "overall": "<confident|nervous|warm|monotone|enthusiastic|relaxed>",
+    "energy": "<high|medium|low>",
+    "authenticity": "<genuine|rehearsed|natural>"
+  },
+  "pacing": {
+    "speed": "<fast|moderate|slow>",
+    "pauseUsage": "<effective|too many|none>",
+    "clarity": <0-100 how clear the speech is>
+  },
+  "content": {
+    "hookStrength": <0-100 how engaging the opening is>,
+    "personalityShown": ["trait1", "trait2", ...],
+    "improvements": ["suggestion1", "suggestion2", ...],
+    "strengths": ["strength1", "strength2", ...]
+  },
+  "overallScore": <0-100 overall effectiveness for dating>,
+  "suggestions": ["actionable tip 1", "actionable tip 2", ...]
+}
+
+Focus on:
+1. Voice quality and confidence level
+2. How engaging and authentic they sound
+3. Whether the content shows personality
+4. Specific actionable improvements
+5. What's working well
+
+Return ONLY valid JSON, no markdown code blocks.`
+
+/**
+ * Analyze a voice note using Gemini 2.5 Flash (multimodal)
+ */
+export async function analyzeVoiceNote(
+  audioData: string | Buffer,
+  mimeType = 'audio/mp3'
+): Promise<VoiceNoteAnalysisResult> {
+  const base64Data = Buffer.isBuffer(audioData)
+    ? audioData.toString('base64')
+    : audioData
+
+  return withRetry(async () => {
     const response = await ai.models.generateContent({
       model: ANALYSIS_MODEL,
-      contents,
-      config: {
-        temperature,
-        maxOutputTokens: maxTokens,
-      },
+      contents: [
+        {
+          inlineData: {
+            mimeType,
+            data: base64Data,
+          },
+        },
+        { text: VOICE_NOTE_ANALYSIS_PROMPT },
+      ],
     })
 
-    return {
-      text: response.text ?? '',
-      model: ANALYSIS_MODEL,
+    const text = response.text ?? ''
+
+    try {
+      let cleanText = text.trim()
+      if (cleanText.startsWith('```json')) {
+        cleanText = cleanText.slice(7)
+      }
+      if (cleanText.startsWith('```')) {
+        cleanText = cleanText.slice(3)
+      }
+      if (cleanText.endsWith('```')) {
+        cleanText = cleanText.slice(0, -3)
+      }
+      cleanText = cleanText.trim()
+
+      const parsed = JSON.parse(cleanText)
+
+      return {
+        transcript: parsed.transcript ?? '',
+        toneAnalysis: parsed.toneAnalysis ?? {
+          overall: 'unknown',
+          energy: 'medium',
+          authenticity: 'unknown',
+        },
+        pacing: parsed.pacing ?? {
+          speed: 'moderate',
+          pauseUsage: 'unknown',
+          clarity: 50,
+        },
+        content: parsed.content ?? {
+          hookStrength: 50,
+          personalityShown: [],
+          improvements: [],
+          strengths: [],
+        },
+        overallScore: parsed.overallScore ?? 50,
+        suggestions: parsed.suggestions ?? [],
+        model: ANALYSIS_MODEL,
+      }
+    } catch {
+      return {
+        transcript: '',
+        toneAnalysis: {
+          overall: 'unknown',
+          energy: 'medium',
+          authenticity: 'unknown',
+        },
+        pacing: {
+          speed: 'moderate',
+          pauseUsage: 'unknown',
+          clarity: 50,
+        },
+        content: {
+          hookStrength: 50,
+          personalityShown: [],
+          improvements: ['Unable to analyze audio'],
+          strengths: [],
+        },
+        overallScore: 50,
+        suggestions: ['Please try uploading a clearer audio file'],
+        model: ANALYSIS_MODEL,
+      }
     }
   })
 }
@@ -470,4 +659,5 @@ export async function generateText(
 export const GEMINI_MODELS = {
   analysis: ANALYSIS_MODEL,
   image: IMAGE_MODEL,
+  fallback: FALLBACK_MODEL,
 }
