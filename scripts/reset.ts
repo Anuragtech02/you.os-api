@@ -40,6 +40,9 @@ async function main() {
     console.log('🧹 Deleting data...')
 
     // Admin tables
+    await db.delete(schema.signupInviteTokens)
+    console.log('   ✓ signup_invite_tokens')
+
     await db.delete(schema.usageMetrics)
     console.log('   ✓ usage_metrics')
 

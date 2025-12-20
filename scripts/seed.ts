@@ -567,6 +567,119 @@ async function seedCompany(users: schema.User[]) {
   return company
 }
 
+async function seedAdminUsers(users: schema.User[]) {
+  console.log('👑 Seeding admin users...')
+
+  // Make test@youos.app a Super Admin
+  const superAdminUser = users.find((u) => u.email === 'test@youos.app')
+  // Make sarah@youos.app a regular Admin
+  const adminUser = users.find((u) => u.email === 'sarah@youos.app')
+
+  if (!superAdminUser) {
+    console.log('  ⚠️ Skipping admin seed - test@youos.app not found')
+    return []
+  }
+
+  const adminsData: schema.NewAdminUser[] = []
+
+  // Super Admin
+  adminsData.push({
+    userId: superAdminUser.id,
+    role: 'super_admin',
+    permissions: {
+      users: { view: true, edit: true, delete: true, deactivate: true },
+      companies: { view: true, edit: true, delete: true },
+      content: { view: true, delete: true, moderate: true },
+      settings: { view: true, edit: true },
+      audit: { view: true, export: true },
+      metrics: { view: true, export: true },
+    },
+    isActive: true,
+  })
+
+  // Regular Admin
+  if (adminUser) {
+    adminsData.push({
+      userId: adminUser.id,
+      role: 'admin',
+      permissions: {
+        users: { view: true, edit: true, delete: false, deactivate: true },
+        companies: { view: true, edit: true, delete: false },
+        content: { view: true, delete: true, moderate: true },
+        settings: { view: true, edit: false },
+        audit: { view: true, export: false },
+        metrics: { view: true, export: false },
+      },
+      isActive: true,
+    })
+  }
+
+  const admins = await db.insert(schema.adminUsers).values(adminsData).returning()
+  console.log(`  ✅ Created ${admins.length} admin users`)
+  console.log(`     - test@youos.app → Super Admin`)
+  if (adminUser) {
+    console.log(`     - sarah@youos.app → Admin`)
+  }
+  return admins
+}
+
+async function seedSignupInviteTokens(admins: schema.AdminUser[]) {
+  console.log('🎟️ Seeding signup invite tokens...')
+
+  const superAdmin = admins.find((a) => a.role === 'super_admin')
+
+  const invitesData: schema.NewSignupInviteToken[] = [
+    {
+      token: 'BETA-TEST-001',
+      email: null, // Can be used by anyone
+      maxUses: '10',
+      usedCount: '0',
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      createdBy: superAdmin?.id,
+      note: 'General beta tester invite',
+      isActive: true,
+    },
+    {
+      token: 'VIP-INVITE-2025',
+      email: 'vip@example.com', // Restricted to specific email
+      maxUses: '1',
+      usedCount: '0',
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      createdBy: superAdmin?.id,
+      note: 'VIP invite for specific user',
+      isActive: true,
+    },
+    {
+      token: 'EXPIRED-TOKEN-123',
+      email: null,
+      maxUses: '5',
+      usedCount: '3',
+      expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // Expired yesterday
+      createdBy: superAdmin?.id,
+      note: 'Expired invite for testing',
+      isActive: true,
+    },
+    {
+      token: 'FULLY-USED-TOKEN',
+      email: null,
+      maxUses: '2',
+      usedCount: '2',
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      createdBy: superAdmin?.id,
+      note: 'Fully used invite for testing',
+      isActive: true,
+    },
+  ]
+
+  const invites = await db.insert(schema.signupInviteTokens).values(invitesData).returning()
+  console.log(`  ✅ Created ${invites.length} signup invite tokens`)
+  console.log(`     - BETA-TEST-001 (10 uses, valid 30 days)`)
+  console.log(`     - VIP-INVITE-2025 (1 use, restricted to vip@example.com)`)
+  console.log(`     - EXPIRED-TOKEN-123 (expired)`)
+  console.log(`     - FULLY-USED-TOKEN (max uses reached)`)
+  return invites
+}
+
 async function seedSyncJobs(users: schema.User[]) {
   console.log('🔄 Seeding sync jobs...')
 
@@ -646,15 +759,21 @@ async function main() {
     await seedPhotos(users)
     await seedGeneratedContent(users, personas)
     await seedCompany(users)
+    const admins = await seedAdminUsers(users)
+    await seedSignupInviteTokens(admins)
     await seedSyncJobs(users)
 
     console.log('\n✅ Database seeded successfully!')
     console.log('\n📋 Test Accounts:')
-    console.log('   Email: test@youos.app (Individual user)')
-    console.log('   Email: sarah@youos.app (Individual user)')
+    console.log('   Email: test@youos.app (Individual user, Super Admin)')
+    console.log('   Email: sarah@youos.app (Individual user, Admin)')
     console.log('   Email: owner@acme.com (Company owner)')
     console.log('   Email: candidate@acme.com (Company candidate)')
+    console.log('\n🎟️  Signup Invite Tokens (for testing invite-only registration):')
+    console.log('   Token: BETA-TEST-001 (10 uses, valid)')
+    console.log('   Token: VIP-INVITE-2025 (1 use, restricted to vip@example.com)')
     console.log('\n⚠️  Remember to create these users in Supabase Auth with matching auth IDs!')
+    console.log('⚠️  Set INVITE_ONLY_REGISTRATION=true to enable invite-only mode.')
   } catch (error) {
     console.error('\n❌ Seed failed:', error)
     process.exit(1)
