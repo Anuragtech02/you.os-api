@@ -131,6 +131,45 @@ export async function authRoutes(fastify: FastifyInstance) {
   })
 
   // =========================================
+  // GET /auth/invite/:token - Validate invite token (public)
+  // =========================================
+  fastify.get<{ Params: { token: string } }>(
+    '/invite/:token',
+    async (request: FastifyRequest<{ Params: { token: string } }>, reply: FastifyReply) => {
+      const { token } = request.params
+
+      if (!token || token.length < 3) {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid invite token', 400)
+      }
+
+      try {
+        const validation = await InviteService.validateInviteToken(token)
+
+        if (!validation.valid) {
+          return sendError(reply, ErrorCodes.NOT_FOUND, validation.error || 'Invalid invite token', 404)
+        }
+
+        const invite = validation.invite!
+
+        return sendSuccess(reply, {
+          valid: true,
+          invite: {
+            // Only expose safe information
+            restrictedToEmail: invite.email || null,
+            expiresAt: invite.expiresAt,
+            remainingUses: parseInt(invite.maxUses, 10) - parseInt(invite.usedCount, 10),
+            note: invite.note, // Optional: could hide this for privacy
+          },
+          inviteOnlyEnabled: InviteService.isInviteOnlyEnabled(),
+        })
+      } catch (error) {
+        fastify.log.error(error, 'Validate invite token error')
+        return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Failed to validate invite token', 500)
+      }
+    }
+  )
+
+  // =========================================
   // POST /auth/login - Sign in
   // =========================================
   fastify.post('/login', async (request: FastifyRequest, reply: FastifyReply) => {
