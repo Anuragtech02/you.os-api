@@ -10,6 +10,7 @@ export const registerSchema = z.object({
     .regex(/[A-Z]/, 'Password must contain an uppercase letter')
     .regex(/[0-9]/, 'Password must contain a number'),
   fullName: z.string().min(2, 'Name must be at least 2 characters').max(100),
+  inviteToken: z.string().optional(), // Required when INVITE_ONLY_REGISTRATION=true
 })
 
 export type RegisterInput = z.infer<typeof registerSchema>

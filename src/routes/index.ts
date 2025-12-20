@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { API_PREFIX } from '@/config/constants'
+import { adminRoutes } from './admin'
 import { aestheticRoutes } from './aesthetic'
 import { authRoutes } from './auth'
 import { bioRoutes } from './bios'
@@ -47,6 +48,9 @@ export async function registerRoutes(fastify: FastifyInstance) {
 
       // Invite routes (public)
       await api.register(inviteRoutes, { prefix: '/invites' })
+
+      // Admin routes (Super Admin only)
+      await api.register(adminRoutes, { prefix: '/admin' })
 
       // Placeholder route
       api.get('/', async () => ({

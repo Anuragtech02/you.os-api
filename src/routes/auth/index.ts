@@ -6,6 +6,7 @@ import { db } from '@/db/client'
 import { users } from '@/db/schema'
 import { ErrorCodes, sendError, sendSuccess } from '@/utils/response'
 import { changePasswordSchema, loginSchema, registerSchema, updateProfileSchema } from './schemas'
+import * as InviteService from '@/services/admin/invites'
 
 // Create Supabase client for auth operations
 const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
@@ -23,9 +24,27 @@ export async function authRoutes(fastify: FastifyInstance) {
       })
     }
 
-    const { email, password, fullName } = parseResult.data
+    const { email, password, fullName, inviteToken } = parseResult.data
 
     try {
+      // Check if invite-only mode is enabled
+      if (InviteService.isInviteOnlyEnabled()) {
+        if (!inviteToken) {
+          return sendError(
+            reply,
+            ErrorCodes.FORBIDDEN,
+            'Registration is invite-only. Please provide an invite token.',
+            403
+          )
+        }
+
+        // Validate invite token
+        const validation = await InviteService.validateInviteToken(inviteToken, email)
+        if (!validation.valid) {
+          return sendError(reply, ErrorCodes.FORBIDDEN, validation.error || 'Invalid invite token', 403)
+        }
+      }
+
       // Check if user already exists
       const [existingUser] = await db.select().from(users).where(eq(users.email, email)).limit(1)
 
@@ -58,6 +77,11 @@ export async function authRoutes(fastify: FastifyInstance) {
       if (!newUser) {
         fastify.log.error('Failed to create user in database')
         return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Failed to create account', 500)
+      }
+
+      // Mark invite token as used (if applicable)
+      if (inviteToken && InviteService.isInviteOnlyEnabled()) {
+        await InviteService.useInviteToken(inviteToken)
       }
 
       // Sign in the user to get tokens

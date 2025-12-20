@@ -121,6 +121,38 @@ export const featureFlags = pgTable(
   (table) => [index('idx_feature_flags_key').on(table.key)]
 )
 
+// Signup Invite Tokens table (for invite-only registration)
+export const signupInviteTokens = pgTable(
+  'signup_invite_tokens',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    token: text('token').notNull().unique(),
+
+    // Optional: restrict to specific email
+    email: text('email'),
+
+    // Usage limits
+    maxUses: text('max_uses').default('1').notNull(),
+    usedCount: text('used_count').default('0').notNull(),
+
+    // Expiration
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+
+    // Tracking
+    createdBy: uuid('created_by').references(() => adminUsers.id),
+    note: text('note'),
+
+    // Status
+    isActive: boolean('is_active').default(true).notNull(),
+
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_signup_invite_tokens_token').on(table.token),
+    index('idx_signup_invite_tokens_email').on(table.email),
+  ]
+)
+
 // Usage Metrics table (for cost tracking)
 export const usageMetrics = pgTable(
   'usage_metrics',
@@ -219,3 +251,5 @@ export type NewAuditLog = typeof auditLogs.$inferInsert
 export type SystemSetting = typeof systemSettings.$inferSelect
 export type FeatureFlag = typeof featureFlags.$inferSelect
 export type UsageMetric = typeof usageMetrics.$inferSelect
+export type SignupInviteToken = typeof signupInviteTokens.$inferSelect
+export type NewSignupInviteToken = typeof signupInviteTokens.$inferInsert
