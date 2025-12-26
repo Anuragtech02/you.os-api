@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
 import { db } from '@/db/client'
+import { checkBucketHealth, STORAGE_CONFIG } from '@/services/photos/storage'
 
 export async function healthRoutes(fastify: FastifyInstance) {
   // Basic health check
@@ -17,7 +18,7 @@ export async function healthRoutes(fastify: FastifyInstance) {
 
   // Detailed health check (for monitoring)
   fastify.get('/health/detailed', async () => {
-    const checks: Record<string, { status: 'ok' | 'error'; latencyMs?: number; error?: string }> =
+    const checks: Record<string, { status: 'ok' | 'error'; latencyMs?: number; error?: string; bucket?: string }> =
       {}
 
     // Database check
@@ -32,6 +33,31 @@ export async function healthRoutes(fastify: FastifyInstance) {
       checks.database = {
         status: 'error',
         error: err instanceof Error ? err.message : 'Unknown error',
+      }
+    }
+
+    // Storage check
+    const storageStart = performance.now()
+    try {
+      const bucketExists = await checkBucketHealth()
+      if (bucketExists) {
+        checks.storage = {
+          status: 'ok',
+          latencyMs: Math.round(performance.now() - storageStart),
+          bucket: STORAGE_CONFIG.bucket,
+        }
+      } else {
+        checks.storage = {
+          status: 'error',
+          error: `Bucket "${STORAGE_CONFIG.bucket}" not found`,
+          bucket: STORAGE_CONFIG.bucket,
+        }
+      }
+    } catch (err) {
+      checks.storage = {
+        status: 'error',
+        error: err instanceof Error ? err.message : 'Unknown error',
+        bucket: STORAGE_CONFIG.bucket,
       }
     }
 
