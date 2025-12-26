@@ -24,6 +24,7 @@ import {
   userListQuerySchema,
   userActionSchema,
   createInviteTokenSchema,
+  updateCompanyEmployeeSchema,
 } from './schemas'
 
 /**
@@ -385,6 +386,209 @@ export async function adminRoutes(fastify: FastifyInstance) {
         }
         fastify.log.error(error, 'Assign company admin error')
         return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Failed to assign company admin', 500)
+      }
+    }
+  )
+
+  /**
+   * GET /admin/companies/:id/employees - List company employees
+   */
+  fastify.get<{ Params: { id: string }; Querystring: Record<string, string> }>(
+    '/companies/:id/employees',
+    { preHandler: [fastify.authenticate, requireSuperAdmin] },
+    async (request, reply) => {
+      const idResult = uuidSchema.safeParse(request.params.id)
+      if (!idResult.success) {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid company ID', 400)
+      }
+
+      const queryResult = paginationSchema.safeParse(request.query)
+      const query = queryResult.success ? queryResult.data : { limit: 50, offset: 0 }
+
+      try {
+        const { employees, total } = await AdminService.listCompanyEmployees(idResult.data, query)
+
+        return sendSuccess(
+          reply,
+          {
+            employees: employees.map((emp) => ({
+              id: emp.id,
+              userId: emp.userId,
+              email: emp.user?.email,
+              fullName: emp.user?.fullName,
+              avatarUrl: emp.user?.avatarUrl,
+              role: emp.role,
+              department: emp.department,
+              title: emp.title,
+              isActive: emp.isActive,
+              joinedAt: emp.joinedAt,
+              createdAt: emp.createdAt,
+            })),
+          },
+          200,
+          { total, limit: query.limit, offset: query.offset }
+        )
+      } catch (error) {
+        if (error instanceof ApiError) {
+          return sendError(reply, error.code, error.message, error.statusCode)
+        }
+        fastify.log.error(error, 'List company employees error')
+        return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Failed to list company employees', 500)
+      }
+    }
+  )
+
+  /**
+   * PATCH /admin/companies/:id/employees/:userId - Update company employee
+   */
+  fastify.patch<{ Params: { id: string; userId: string }; Body: unknown }>(
+    '/companies/:id/employees/:userId',
+    { preHandler: [fastify.authenticate, requireSuperAdmin] },
+    async (request, reply) => {
+      const companyIdResult = uuidSchema.safeParse(request.params.id)
+      if (!companyIdResult.success) {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid company ID', 400)
+      }
+
+      const userIdResult = uuidSchema.safeParse(request.params.userId)
+      if (!userIdResult.success) {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid user ID', 400)
+      }
+
+      const bodyResult = updateCompanyEmployeeSchema.safeParse(request.body)
+      if (!bodyResult.success) {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid request body', 400, {
+          errors: bodyResult.error.flatten().fieldErrors,
+        })
+      }
+
+      try {
+        const employee = await AdminService.updateCompanyEmployee(
+          companyIdResult.data,
+          userIdResult.data,
+          bodyResult.data
+        )
+
+        return sendSuccess(reply, {
+          id: employee.id,
+          userId: employee.userId,
+          role: employee.role,
+          isActive: employee.isActive,
+          updatedAt: employee.updatedAt,
+        })
+      } catch (error) {
+        if (error instanceof ApiError) {
+          return sendError(reply, error.code, error.message, error.statusCode)
+        }
+        fastify.log.error(error, 'Update company employee error')
+        return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Failed to update company employee', 500)
+      }
+    }
+  )
+
+  /**
+   * DELETE /admin/companies/:id/employees/:userId - Remove company employee
+   */
+  fastify.delete<{ Params: { id: string; userId: string } }>(
+    '/companies/:id/employees/:userId',
+    { preHandler: [fastify.authenticate, requireSuperAdmin] },
+    async (request, reply) => {
+      const companyIdResult = uuidSchema.safeParse(request.params.id)
+      if (!companyIdResult.success) {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid company ID', 400)
+      }
+
+      const userIdResult = uuidSchema.safeParse(request.params.userId)
+      if (!userIdResult.success) {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid user ID', 400)
+      }
+
+      try {
+        await AdminService.removeCompanyEmployee(companyIdResult.data, userIdResult.data)
+        return sendSuccess(reply, { removed: true })
+      } catch (error) {
+        if (error instanceof ApiError) {
+          return sendError(reply, error.code, error.message, error.statusCode)
+        }
+        fastify.log.error(error, 'Remove company employee error')
+        return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Failed to remove company employee', 500)
+      }
+    }
+  )
+
+  /**
+   * GET /admin/companies/:id/invites - List company invites
+   */
+  fastify.get<{ Params: { id: string }; Querystring: Record<string, string> }>(
+    '/companies/:id/invites',
+    { preHandler: [fastify.authenticate, requireSuperAdmin] },
+    async (request, reply) => {
+      const idResult = uuidSchema.safeParse(request.params.id)
+      if (!idResult.success) {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid company ID', 400)
+      }
+
+      const queryResult = paginationSchema.safeParse(request.query)
+      const query = queryResult.success ? queryResult.data : { limit: 50, offset: 0 }
+
+      try {
+        const { invites, total } = await AdminService.listCompanyInvites(idResult.data, {
+          ...query,
+          status: request.query.status,
+        })
+
+        return sendSuccess(
+          reply,
+          {
+            invites: invites.map((invite) => ({
+              id: invite.id,
+              email: invite.email,
+              role: invite.role,
+              token: invite.token,
+              status: invite.status,
+              expiresAt: invite.expiresAt,
+              createdAt: invite.createdAt,
+            })),
+          },
+          200,
+          { total, limit: query.limit, offset: query.offset }
+        )
+      } catch (error) {
+        if (error instanceof ApiError) {
+          return sendError(reply, error.code, error.message, error.statusCode)
+        }
+        fastify.log.error(error, 'List company invites error')
+        return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Failed to list company invites', 500)
+      }
+    }
+  )
+
+  /**
+   * DELETE /admin/companies/:id/invites/:inviteId - Revoke company invite
+   */
+  fastify.delete<{ Params: { id: string; inviteId: string } }>(
+    '/companies/:id/invites/:inviteId',
+    { preHandler: [fastify.authenticate, requireSuperAdmin] },
+    async (request, reply) => {
+      const companyIdResult = uuidSchema.safeParse(request.params.id)
+      if (!companyIdResult.success) {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid company ID', 400)
+      }
+
+      const inviteIdResult = uuidSchema.safeParse(request.params.inviteId)
+      if (!inviteIdResult.success) {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid invite ID', 400)
+      }
+
+      try {
+        await AdminService.revokeCompanyInvite(companyIdResult.data, inviteIdResult.data)
+        return sendSuccess(reply, { revoked: true })
+      } catch (error) {
+        if (error instanceof ApiError) {
+          return sendError(reply, error.code, error.message, error.statusCode)
+        }
+        fastify.log.error(error, 'Revoke company invite error')
+        return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Failed to revoke company invite', 500)
       }
     }
   )

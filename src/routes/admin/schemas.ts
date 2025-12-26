@@ -81,6 +81,17 @@ export const userActionSchema = z.object({
 })
 
 // =========================================
+// Company Employee Schemas
+// =========================================
+
+export const companyEmployeeRoleSchema = z.enum(['admin', 'manager', 'candidate'])
+
+export const updateCompanyEmployeeSchema = z.object({
+  role: companyEmployeeRoleSchema.optional(),
+  isActive: z.boolean().optional(),
+})
+
+// =========================================
 // Invite Schemas
 // =========================================
 

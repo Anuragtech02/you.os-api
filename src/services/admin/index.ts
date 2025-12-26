@@ -14,11 +14,14 @@ import {
   adminUsers,
   companies,
   companyCandidates,
+  companyInvites,
   users,
   identityBrains,
   type AdminUser,
   type Company,
   type User,
+  type CompanyCandidate,
+  type CompanyInvite,
 } from '@/db/schema'
 import { ApiError } from '@/utils/errors'
 import { ErrorCodes } from '@/utils/response'
@@ -551,6 +554,195 @@ export async function reactivateUser(userId: string): Promise<void> {
 
   if (!updated) {
     throw new ApiError(ErrorCodes.NOT_FOUND, 'User not found', 404)
+  }
+}
+
+// =========================================
+// Company Employees Management (Super Admin)
+// =========================================
+
+/**
+ * List company employees (Super Admin)
+ */
+export async function listCompanyEmployees(
+  companyId: string,
+  options: { limit?: number; offset?: number }
+): Promise<{ employees: (CompanyCandidate & { user: User | null })[]; total: number }> {
+  const { limit = 50, offset = 0 } = options
+
+  // Verify company exists
+  const [company] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1)
+  if (!company) {
+    throw new ApiError(ErrorCodes.NOT_FOUND, 'Company not found', 404)
+  }
+
+  const employeesWithUsers = await db
+    .select({
+      employee: companyCandidates,
+      user: users,
+    })
+    .from(companyCandidates)
+    .leftJoin(users, eq(companyCandidates.userId, users.id))
+    .where(eq(companyCandidates.companyId, companyId))
+    .orderBy(desc(companyCandidates.createdAt))
+    .limit(limit)
+    .offset(offset)
+
+  const totalResult = await db
+    .select({ value: count() })
+    .from(companyCandidates)
+    .where(eq(companyCandidates.companyId, companyId))
+
+  const total = totalResult[0]?.value ?? 0
+
+  return {
+    employees: employeesWithUsers.map((row) => ({
+      ...row.employee,
+      user: row.user,
+    })),
+    total,
+  }
+}
+
+/**
+ * Update company employee role (Super Admin)
+ */
+export async function updateCompanyEmployee(
+  companyId: string,
+  userId: string,
+  data: { role?: string; isActive?: boolean }
+): Promise<CompanyCandidate> {
+  // Verify company exists
+  const [company] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1)
+  if (!company) {
+    throw new ApiError(ErrorCodes.NOT_FOUND, 'Company not found', 404)
+  }
+
+  // Find employee
+  const [existing] = await db
+    .select()
+    .from(companyCandidates)
+    .where(and(eq(companyCandidates.companyId, companyId), eq(companyCandidates.userId, userId)))
+    .limit(1)
+
+  if (!existing) {
+    throw new ApiError(ErrorCodes.NOT_FOUND, 'Employee not found in company', 404)
+  }
+
+  const updateData: Record<string, unknown> = { updatedAt: new Date() }
+  if (data.role !== undefined) updateData.role = data.role
+  if (data.isActive !== undefined) updateData.isActive = data.isActive
+
+  const [updated] = await db
+    .update(companyCandidates)
+    .set(updateData)
+    .where(eq(companyCandidates.id, existing.id))
+    .returning()
+
+  if (!updated) {
+    throw new ApiError(ErrorCodes.INTERNAL_ERROR, 'Failed to update employee', 500)
+  }
+
+  return updated
+}
+
+/**
+ * Remove company employee (Super Admin)
+ */
+export async function removeCompanyEmployee(companyId: string, userId: string): Promise<void> {
+  // Verify company exists
+  const [company] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1)
+  if (!company) {
+    throw new ApiError(ErrorCodes.NOT_FOUND, 'Company not found', 404)
+  }
+
+  // Cannot remove owner
+  if (company.ownerId === userId) {
+    throw new ApiError(ErrorCodes.FORBIDDEN, 'Cannot remove company owner', 403)
+  }
+
+  // Find and delete employee
+  const [deleted] = await db
+    .delete(companyCandidates)
+    .where(and(eq(companyCandidates.companyId, companyId), eq(companyCandidates.userId, userId)))
+    .returning()
+
+  if (!deleted) {
+    throw new ApiError(ErrorCodes.NOT_FOUND, 'Employee not found in company', 404)
+  }
+
+  // Update user's company association if they're leaving
+  await db
+    .update(users)
+    .set({
+      companyId: null,
+      accountType: 'individual',
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId))
+}
+
+// =========================================
+// Company Invites Management (Super Admin)
+// =========================================
+
+/**
+ * List company invites (Super Admin)
+ */
+export async function listCompanyInvites(
+  companyId: string,
+  options: { limit?: number; offset?: number; status?: string }
+): Promise<{ invites: CompanyInvite[]; total: number }> {
+  const { limit = 50, offset = 0, status } = options
+
+  // Verify company exists
+  const [company] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1)
+  if (!company) {
+    throw new ApiError(ErrorCodes.NOT_FOUND, 'Company not found', 404)
+  }
+
+  const conditions = [eq(companyInvites.companyId, companyId)]
+  if (status) {
+    conditions.push(eq(companyInvites.status, status))
+  }
+
+  const inviteList = await db
+    .select()
+    .from(companyInvites)
+    .where(and(...conditions))
+    .orderBy(desc(companyInvites.createdAt))
+    .limit(limit)
+    .offset(offset)
+
+  const totalResult = await db
+    .select({ value: count() })
+    .from(companyInvites)
+    .where(and(...conditions))
+
+  const total = totalResult[0]?.value ?? 0
+
+  return { invites: inviteList, total }
+}
+
+/**
+ * Revoke company invite (Super Admin)
+ */
+export async function revokeCompanyInvite(companyId: string, inviteId: string): Promise<void> {
+  // Verify company exists
+  const [company] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1)
+  if (!company) {
+    throw new ApiError(ErrorCodes.NOT_FOUND, 'Company not found', 404)
+  }
+
+  // Find and update invite
+  const [updated] = await db
+    .update(companyInvites)
+    .set({ status: 'revoked' })
+    .where(and(eq(companyInvites.id, inviteId), eq(companyInvites.companyId, companyId)))
+    .returning()
+
+  if (!updated) {
+    throw new ApiError(ErrorCodes.NOT_FOUND, 'Invite not found', 404)
   }
 }
 
