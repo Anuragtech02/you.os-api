@@ -19,6 +19,15 @@ export const paginationSchema = z.object({
 })
 
 // =========================================
+// Admin Auth Schemas
+// =========================================
+
+export const adminLoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+})
+
+// =========================================
 // Admin User Schemas
 // =========================================
 

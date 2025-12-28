@@ -8,7 +8,12 @@
  * - System configuration
  */
 
+import { createClient } from '@supabase/supabase-js'
+import { eq } from 'drizzle-orm'
 import type { FastifyInstance } from 'fastify'
+import { env } from '@/config/env'
+import { db } from '@/db/client'
+import { users } from '@/db/schema'
 import * as AdminService from '@/services/admin'
 import * as InviteService from '@/services/admin/invites'
 import { ApiError } from '@/utils/errors'
@@ -16,6 +21,7 @@ import { ErrorCodes, sendError, sendSuccess } from '@/utils/response'
 import {
   uuidSchema,
   paginationSchema,
+  adminLoginSchema,
   createAdminSchema,
   updateAdminSchema,
   createCompanySchema,
@@ -56,7 +62,101 @@ async function requireAdmin(request: any, reply: any) {
   }
 }
 
+// Create Supabase client for auth operations
+const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+
 export async function adminRoutes(fastify: FastifyInstance) {
+  // =========================================
+  // Admin Authentication
+  // =========================================
+
+  /**
+   * POST /admin/login - Admin-specific login
+   * Validates credentials AND verifies admin status
+   */
+  fastify.post<{ Body: unknown }>('/login', async (request, reply) => {
+    const parseResult = adminLoginSchema.safeParse(request.body)
+
+    if (!parseResult.success) {
+      return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid input', 400, {
+        errors: parseResult.error.flatten().fieldErrors,
+      })
+    }
+
+    const { email, password } = parseResult.data
+
+    try {
+      // Sign in with Supabase
+      const { data: session, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (authError) {
+        if (authError.message.includes('Invalid login credentials')) {
+          return sendError(reply, ErrorCodes.UNAUTHORIZED, 'Invalid email or password', 401)
+        }
+        fastify.log.error(authError, 'Admin login error')
+        return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Login failed', 500)
+      }
+
+      if (!session.session || !session.user) {
+        return sendError(reply, ErrorCodes.UNAUTHORIZED, 'Invalid email or password', 401)
+      }
+
+      // Get user from our database
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.authId, session.user.id))
+        .limit(1)
+
+      if (!dbUser) {
+        return sendError(reply, ErrorCodes.UNAUTHORIZED, 'User not found', 401)
+      }
+
+      if (!dbUser.isActive) {
+        return sendError(reply, ErrorCodes.FORBIDDEN, 'Account is deactivated', 403)
+      }
+
+      // Check if user is an admin
+      const adminUser = await AdminService.getAdminByUserId(dbUser.id)
+
+      if (!adminUser) {
+        return sendError(reply, ErrorCodes.FORBIDDEN, 'Admin access required. This account does not have admin privileges.', 403)
+      }
+
+      if (!adminUser.isActive) {
+        return sendError(reply, ErrorCodes.FORBIDDEN, 'Admin account is deactivated', 403)
+      }
+
+      // Update last login timestamp
+      await AdminService.updateAdminLastLogin(adminUser.id)
+
+      return sendSuccess(reply, {
+        user: {
+          id: dbUser.id,
+          email: dbUser.email,
+          fullName: dbUser.fullName,
+          avatarUrl: dbUser.avatarUrl,
+        },
+        admin: {
+          id: adminUser.id,
+          role: adminUser.role,
+          permissions: adminUser.permissions,
+        },
+        session: {
+          accessToken: session.session.access_token,
+          refreshToken: session.session.refresh_token,
+          expiresAt: session.session.expires_at,
+        },
+      })
+    } catch (error) {
+      fastify.log.error(error, 'Admin login error')
+      return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Login failed', 500)
+    }
+  })
+
   // =========================================
   // Admin User Management
   // =========================================

@@ -121,6 +121,16 @@ export async function updateAdminRole(
 }
 
 /**
+ * Update admin last login timestamp
+ */
+export async function updateAdminLastLogin(adminId: string): Promise<void> {
+  await db
+    .update(adminUsers)
+    .set({ lastLoginAt: new Date(), updatedAt: new Date() })
+    .where(eq(adminUsers.id, adminId))
+}
+
+/**
  * Deactivate admin
  */
 export async function deactivateAdmin(adminId: string): Promise<void> {
