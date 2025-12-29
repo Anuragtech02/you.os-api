@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { env } from '@/config/env'
 import { db } from '@/db/client'
-import { users } from '@/db/schema'
+import { photos, users } from '@/db/schema'
 import { ErrorCodes, sendError, sendSuccess } from '@/utils/response'
 import { changePasswordSchema, loginSchema, registerSchema, updateProfileSchema } from './schemas'
 import * as InviteService from '@/services/admin/invites'
@@ -335,12 +335,24 @@ export async function authRoutes(fastify: FastifyInstance) {
           return sendError(reply, ErrorCodes.USER_NOT_FOUND, 'User not found', 404)
         }
 
+        // Look up avatar photo ID if user has an avatarUrl
+        let avatarPhotoId: string | null = null
+        if (user.avatarUrl) {
+          const [avatarPhoto] = await db
+            .select({ id: photos.id })
+            .from(photos)
+            .where(and(eq(photos.userId, user.id), eq(photos.originalUrl, user.avatarUrl)))
+            .limit(1)
+          avatarPhotoId = avatarPhoto?.id ?? null
+        }
+
         return sendSuccess(reply, {
           user: {
             id: user.id,
             email: user.email,
             fullName: user.fullName,
             avatarUrl: user.avatarUrl,
+            avatarPhotoId,
             accountType: user.accountType,
             companyId: user.companyId,
             preferences: user.preferences,

@@ -918,7 +918,7 @@ export async function adminRoutes(fastify: FastifyInstance) {
             expiresAt: invite.expiresAt,
             note: invite.note,
             // Include signup URL for convenience
-            signupUrl: `${process.env.FRONTEND_URL || 'https://youos.app'}/signup?invite=${invite.token}`,
+            signupUrl: `${process.env.FRONTEND_URL || 'https://youos.app'}/register?invite=${invite.token}`,
           },
           201
         )
