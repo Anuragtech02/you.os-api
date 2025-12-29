@@ -6,6 +6,7 @@
 
 import type { FastifyInstance } from 'fastify'
 import * as PhotoService from '@/services/photos'
+import * as StorageService from '@/services/photos/storage'
 import { ErrorCodes, sendError, sendSuccess } from '@/utils/response'
 import {
   categoryUpdateSchema,
@@ -128,6 +129,44 @@ export async function photoRoutes(fastify: FastifyInstance) {
       }
 
       return sendSuccess(reply, { photo })
+    }
+  )
+
+  /**
+   * GET /photos/:id/signed-url - Get a signed URL for a photo (for private buckets)
+   */
+  fastify.get<{ Params: { id: string }; Querystring: { expiresIn?: string } }>(
+    '/:id/signed-url',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const idResult = photoIdSchema.safeParse(request.params.id)
+      if (!idResult.success) {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid photo ID', 400)
+      }
+
+      const photo = await PhotoService.getByIdForUser(request.params.id, request.user!.id)
+      if (!photo) {
+        return sendError(reply, ErrorCodes.NOT_FOUND, 'Photo not found', 404)
+      }
+
+      try {
+        // Default 1 hour, max 7 days
+        const expiresIn = Math.min(
+          Math.max(parseInt(request.query.expiresIn ?? '3600', 10) || 3600, 60),
+          604800
+        )
+
+        const signedUrl = await StorageService.getSignedUrl(photo.storagePath, expiresIn)
+
+        return sendSuccess(reply, {
+          signedUrl,
+          expiresIn,
+          expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
+        })
+      } catch (error) {
+        fastify.log.error(error, 'Failed to generate signed URL')
+        return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Failed to generate signed URL', 500)
+      }
     }
   )
 
