@@ -40,6 +40,19 @@ async function registerPlugins() {
   })
 }
 
+// Disable logging for health check endpoints to reduce noise
+fastify.addHook('onRequest', (request, _reply, done) => {
+  if (request.url === '/health' || request.url.startsWith('/health')) {
+    request.log = {
+      ...request.log,
+      info: () => {},
+      debug: () => {},
+      trace: () => {},
+    } as typeof request.log
+  }
+  done()
+})
+
 // Register routes
 async function setupRoutes() {
   await registerRoutes(fastify)
