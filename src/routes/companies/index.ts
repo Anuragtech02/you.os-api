@@ -457,6 +457,7 @@ export async function companyRoutes(fastify: FastifyInstance) {
               email: inv.email,
               role: inv.role,
               status: inv.status,
+              token: inv.token,
               expiresAt: inv.expiresAt,
               invitedBy: inv.inviterName || 'Unknown',
               createdAt: inv.createdAt,
