@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, or } from 'drizzle-orm'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { env } from '@/config/env'
 import { db } from '@/db/client'
@@ -340,17 +340,32 @@ export async function authRoutes(fastify: FastifyInstance) {
         let avatarPhotoId: string | null = null
         let avatarSignedUrl: string | null = null
         if (user.avatarUrl) {
+          // Avatar could be original or enhanced URL, check both
           const [avatarPhoto] = await db
-            .select({ id: photos.id, storagePath: photos.storagePath })
+            .select({ id: photos.id, storagePath: photos.storagePath, originalUrl: photos.originalUrl, enhancedUrl: photos.enhancedUrl })
             .from(photos)
-            .where(and(eq(photos.userId, user.id), eq(photos.originalUrl, user.avatarUrl)))
+            .where(and(
+              eq(photos.userId, user.id),
+              or(eq(photos.originalUrl, user.avatarUrl), eq(photos.enhancedUrl, user.avatarUrl))
+            ))
             .limit(1)
           avatarPhotoId = avatarPhoto?.id ?? null
 
           // Get signed URL for avatar
-          if (avatarPhoto?.storagePath) {
+          if (avatarPhoto) {
             try {
-              avatarSignedUrl = await StorageService.getSignedUrl(avatarPhoto.storagePath)
+              // Determine which URL is being used and get appropriate signed URL
+              const isEnhanced = user.avatarUrl === avatarPhoto.enhancedUrl
+              if (isEnhanced && avatarPhoto.enhancedUrl) {
+                // Extract path from enhanced URL and sign it
+                const enhancedPath = StorageService.extractStoragePathFromUrl(avatarPhoto.enhancedUrl)
+                if (enhancedPath) {
+                  avatarSignedUrl = await StorageService.getSignedUrl(enhancedPath)
+                }
+              } else {
+                // Use original storage path
+                avatarSignedUrl = await StorageService.getSignedUrl(avatarPhoto.storagePath)
+              }
             } catch {
               // Fall back to original URL if signing fails
               avatarSignedUrl = user.avatarUrl
@@ -413,15 +428,27 @@ export async function authRoutes(fastify: FastifyInstance) {
         // Get signed URL for avatar if it exists
         let avatarSignedUrl: string | null = null
         if (updatedUser.avatarUrl) {
+          // Avatar could be original or enhanced URL, check both
           const [avatarPhoto] = await db
-            .select({ storagePath: photos.storagePath })
+            .select({ storagePath: photos.storagePath, originalUrl: photos.originalUrl, enhancedUrl: photos.enhancedUrl })
             .from(photos)
-            .where(and(eq(photos.userId, updatedUser.id), eq(photos.originalUrl, updatedUser.avatarUrl)))
+            .where(and(
+              eq(photos.userId, updatedUser.id),
+              or(eq(photos.originalUrl, updatedUser.avatarUrl), eq(photos.enhancedUrl, updatedUser.avatarUrl))
+            ))
             .limit(1)
 
-          if (avatarPhoto?.storagePath) {
+          if (avatarPhoto) {
             try {
-              avatarSignedUrl = await StorageService.getSignedUrl(avatarPhoto.storagePath)
+              const isEnhanced = updatedUser.avatarUrl === avatarPhoto.enhancedUrl
+              if (isEnhanced && avatarPhoto.enhancedUrl) {
+                const enhancedPath = StorageService.extractStoragePathFromUrl(avatarPhoto.enhancedUrl)
+                if (enhancedPath) {
+                  avatarSignedUrl = await StorageService.getSignedUrl(enhancedPath)
+                }
+              } else {
+                avatarSignedUrl = await StorageService.getSignedUrl(avatarPhoto.storagePath)
+              }
             } catch {
               avatarSignedUrl = updatedUser.avatarUrl
             }
