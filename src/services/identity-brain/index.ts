@@ -271,6 +271,87 @@ function getDefaultLearningState(): LearningState {
   }
 }
 
+// ============================================
+// Completion Score Calculation
+// ============================================
+
+/**
+ * Fields used for completion score calculation with their weights
+ */
+const COMPLETION_FIELDS: { field: keyof CoreAttributes; weight: number; isArray?: boolean }[] = [
+  { field: 'name', weight: 15 },
+  { field: 'age', weight: 5 },
+  { field: 'location', weight: 10 },
+  { field: 'occupation', weight: 10 },
+  { field: 'headline', weight: 10 },
+  { field: 'shortBio', weight: 15 },
+  { field: 'interests', weight: 10, isArray: true },
+  { field: 'values', weight: 5, isArray: true },
+  { field: 'personality', weight: 5, isArray: true },
+  { field: 'goals', weight: 5, isArray: true },
+  { field: 'quirks', weight: 5, isArray: true },
+  { field: 'communicationStyle', weight: 5 },
+]
+
+/**
+ * Calculate the completion score for an identity brain (0-100)
+ */
+export function calculateCompletionScore(coreAttributes: CoreAttributes): number {
+  let score = 0
+  const totalWeight = COMPLETION_FIELDS.reduce((sum, f) => sum + f.weight, 0)
+
+  for (const { field, weight, isArray } of COMPLETION_FIELDS) {
+    const value = coreAttributes[field]
+
+    if (isArray) {
+      // For arrays, check if they have at least one item
+      if (Array.isArray(value) && value.length > 0) {
+        score += weight
+      }
+    } else {
+      // For scalar values, check if they're defined and not empty
+      if (value !== undefined && value !== null && value !== '') {
+        score += weight
+      }
+    }
+  }
+
+  // Normalize to 0-100
+  return Math.round((score / totalWeight) * 100)
+}
+
+/**
+ * Get completion details showing which fields are filled
+ */
+export function getCompletionDetails(coreAttributes: CoreAttributes): {
+  score: number
+  filledFields: string[]
+  missingFields: string[]
+} {
+  const filledFields: string[] = []
+  const missingFields: string[] = []
+
+  for (const { field, isArray } of COMPLETION_FIELDS) {
+    const value = coreAttributes[field]
+
+    const isFilled = isArray
+      ? Array.isArray(value) && value.length > 0
+      : value !== undefined && value !== null && value !== ''
+
+    if (isFilled) {
+      filledFields.push(String(field))
+    } else {
+      missingFields.push(String(field))
+    }
+  }
+
+  return {
+    score: calculateCompletionScore(coreAttributes),
+    filledFields,
+    missingFields,
+  }
+}
+
 // Re-export types and sub-services
 export type { PersonaType } from './personas'
 export * as PersonaService from './personas'

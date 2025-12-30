@@ -44,7 +44,12 @@ export async function identityBrainRoutes(fastify: FastifyInstance) {
         return sendError(reply, ErrorCodes.NOT_FOUND, 'Identity brain not found', 404)
       }
 
-      return sendSuccess(reply, { identityBrain: brain })
+      const completion = IdentityBrainService.getCompletionDetails(brain.coreAttributes)
+
+      return sendSuccess(reply, {
+        identityBrain: brain,
+        completion,
+      })
     }
   )
 
@@ -65,7 +70,8 @@ export async function identityBrainRoutes(fastify: FastifyInstance) {
 
       try {
         const brain = await IdentityBrainService.create(request.user!.id, parseResult.data)
-        return sendSuccess(reply, { identityBrain: brain }, 201)
+        const completion = IdentityBrainService.getCompletionDetails(brain.coreAttributes)
+        return sendSuccess(reply, { identityBrain: brain, completion }, 201)
       } catch (error) {
         if ((error as Error).name === 'ApiError') {
           throw error
@@ -97,7 +103,8 @@ export async function identityBrainRoutes(fastify: FastifyInstance) {
 
       try {
         const updated = await IdentityBrainService.update(brain.id, parseResult.data)
-        return sendSuccess(reply, { identityBrain: updated })
+        const completion = IdentityBrainService.getCompletionDetails(updated.coreAttributes)
+        return sendSuccess(reply, { identityBrain: updated, completion })
       } catch (error) {
         if ((error as Error).name === 'ApiError') {
           throw error
@@ -133,7 +140,8 @@ export async function identityBrainRoutes(fastify: FastifyInstance) {
 
       try {
         const updated = await IdentityBrainService.updateCoreAttributes(brain.id, parseResult.data)
-        return sendSuccess(reply, { identityBrain: updated })
+        const completion = IdentityBrainService.getCompletionDetails(updated.coreAttributes)
+        return sendSuccess(reply, { identityBrain: updated, completion })
       } catch (error) {
         if ((error as Error).name === 'ApiError') {
           throw error
