@@ -109,6 +109,8 @@ export interface CoreAttributes {
   age?: number
   location?: string
   occupation?: string
+  headline?: string
+  shortBio?: string
   interests?: string[]
   values?: string[]
   personality?: string[]
