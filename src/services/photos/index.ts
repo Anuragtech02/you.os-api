@@ -482,15 +482,25 @@ export interface PhotoWithSignedUrls extends Omit<Photo, 'originalUrl' | 'enhanc
  * Add signed URLs to a single photo
  */
 export async function withSignedUrls(photo: Photo): Promise<PhotoWithSignedUrls> {
-  const { signedOriginalUrl, signedEnhancedUrl } = await StorageService.getPhotoSignedUrls(
-    photo.storagePath,
-    photo.enhancedUrl
-  )
+  try {
+    const { signedOriginalUrl, signedEnhancedUrl } = await StorageService.getPhotoSignedUrls(
+      photo.storagePath,
+      photo.enhancedUrl
+    )
 
-  return {
-    ...photo,
-    originalUrl: signedOriginalUrl,
-    enhancedUrl: signedEnhancedUrl,
+    return {
+      ...photo,
+      originalUrl: signedOriginalUrl,
+      enhancedUrl: signedEnhancedUrl,
+    }
+  } catch (error) {
+    // If signing fails (e.g., file not found in storage), fall back to original URLs
+    console.warn(`Failed to get signed URLs for photo ${photo.id}:`, error)
+    return {
+      ...photo,
+      originalUrl: photo.originalUrl,
+      enhancedUrl: photo.enhancedUrl,
+    }
   }
 }
 
