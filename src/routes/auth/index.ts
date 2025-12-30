@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { env } from '@/config/env'
 import { db } from '@/db/client'
 import { photos, users } from '@/db/schema'
+import * as StorageService from '@/services/photos/storage'
 import { ErrorCodes, sendError, sendSuccess } from '@/utils/response'
 import { changePasswordSchema, loginSchema, registerSchema, updateProfileSchema } from './schemas'
 import * as InviteService from '@/services/admin/invites'
@@ -335,15 +336,26 @@ export async function authRoutes(fastify: FastifyInstance) {
           return sendError(reply, ErrorCodes.USER_NOT_FOUND, 'User not found', 404)
         }
 
-        // Look up avatar photo ID if user has an avatarUrl
+        // Look up avatar photo and get signed URL if user has an avatarUrl
         let avatarPhotoId: string | null = null
+        let avatarSignedUrl: string | null = null
         if (user.avatarUrl) {
           const [avatarPhoto] = await db
-            .select({ id: photos.id })
+            .select({ id: photos.id, storagePath: photos.storagePath })
             .from(photos)
             .where(and(eq(photos.userId, user.id), eq(photos.originalUrl, user.avatarUrl)))
             .limit(1)
           avatarPhotoId = avatarPhoto?.id ?? null
+
+          // Get signed URL for avatar
+          if (avatarPhoto?.storagePath) {
+            try {
+              avatarSignedUrl = await StorageService.getSignedUrl(avatarPhoto.storagePath)
+            } catch {
+              // Fall back to original URL if signing fails
+              avatarSignedUrl = user.avatarUrl
+            }
+          }
         }
 
         return sendSuccess(reply, {
@@ -351,7 +363,7 @@ export async function authRoutes(fastify: FastifyInstance) {
             id: user.id,
             email: user.email,
             fullName: user.fullName,
-            avatarUrl: user.avatarUrl,
+            avatarUrl: avatarSignedUrl ?? user.avatarUrl,
             avatarPhotoId,
             accountType: user.accountType,
             companyId: user.companyId,
@@ -398,12 +410,30 @@ export async function authRoutes(fastify: FastifyInstance) {
           return sendError(reply, ErrorCodes.USER_NOT_FOUND, 'User not found', 404)
         }
 
+        // Get signed URL for avatar if it exists
+        let avatarSignedUrl: string | null = null
+        if (updatedUser.avatarUrl) {
+          const [avatarPhoto] = await db
+            .select({ storagePath: photos.storagePath })
+            .from(photos)
+            .where(and(eq(photos.userId, updatedUser.id), eq(photos.originalUrl, updatedUser.avatarUrl)))
+            .limit(1)
+
+          if (avatarPhoto?.storagePath) {
+            try {
+              avatarSignedUrl = await StorageService.getSignedUrl(avatarPhoto.storagePath)
+            } catch {
+              avatarSignedUrl = updatedUser.avatarUrl
+            }
+          }
+        }
+
         return sendSuccess(reply, {
           user: {
             id: updatedUser.id,
             email: updatedUser.email,
             fullName: updatedUser.fullName,
-            avatarUrl: updatedUser.avatarUrl,
+            avatarUrl: avatarSignedUrl ?? updatedUser.avatarUrl,
             accountType: updatedUser.accountType,
             preferences: updatedUser.preferences,
           },
