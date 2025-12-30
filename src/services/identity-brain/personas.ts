@@ -17,32 +17,44 @@ import { Errors } from '@/utils/errors'
 
 export type PersonaType = 'professional' | 'dating' | 'social' | 'private'
 
+/**
+ * Standard tone weight dimensions used across all personas
+ * Each value is on a 0-1 scale
+ */
+interface ToneWeights {
+  confident: number
+  friendly: number
+  witty: number
+  vulnerable: number
+  direct: number
+}
+
 const DEFAULT_PERSONA_CONFIGS: Record<
   PersonaType,
-  { name: string; description: string; toneWeights: Record<string, number>; contentRules: ContentRules }
+  { name: string; description: string; toneWeights: ToneWeights; contentRules: ContentRules }
 > = {
   professional: {
     name: 'Professional',
     description: 'For work, LinkedIn, resumes, and career-related content',
-    toneWeights: { formal: 0.7, confident: 0.8, friendly: 0.4 },
+    toneWeights: { confident: 0.8, friendly: 0.5, witty: 0.3, vulnerable: 0.2, direct: 0.8 },
     contentRules: { formality: 'formal', includeEmoji: false },
   },
   dating: {
     name: 'Dating',
     description: 'For dating profiles, conversations, and romantic contexts',
-    toneWeights: { playful: 0.7, confident: 0.6, warm: 0.8 },
+    toneWeights: { confident: 0.6, friendly: 0.8, witty: 0.7, vulnerable: 0.5, direct: 0.4 },
     contentRules: { formality: 'casual', includeEmoji: true },
   },
   social: {
     name: 'Social',
     description: 'For social media, casual posts, and general online presence',
-    toneWeights: { casual: 0.8, friendly: 0.7, authentic: 0.8 },
+    toneWeights: { confident: 0.5, friendly: 0.8, witty: 0.6, vulnerable: 0.4, direct: 0.5 },
     contentRules: { formality: 'casual', includeEmoji: true },
   },
   private: {
     name: 'Private',
     description: 'Personal notes and private content',
-    toneWeights: { authentic: 1.0, reflective: 0.6 },
+    toneWeights: { confident: 0.5, friendly: 0.5, witty: 0.5, vulnerable: 0.8, direct: 0.5 },
     contentRules: { formality: 'casual' },
   },
 }
