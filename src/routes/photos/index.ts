@@ -133,9 +133,12 @@ export async function photoRoutes(fastify: FastifyInstance) {
   )
 
   /**
-   * GET /photos/:id/signed-url - Get a signed URL for a photo (for private buckets)
+   * GET /photos/:id/signed-url - Get a signed URL for a photo
+   * Query params:
+   *   - type: 'original' | 'enhanced' (default: 'original')
+   *   - expiresIn: number in seconds (default: 3600, max: 604800)
    */
-  fastify.get<{ Params: { id: string }; Querystring: { expiresIn?: string } }>(
+  fastify.get<{ Params: { id: string }; Querystring: { expiresIn?: string; type?: string } }>(
     '/:id/signed-url',
     { preHandler: [fastify.authenticate] },
     async (request, reply) => {
@@ -149,6 +152,11 @@ export async function photoRoutes(fastify: FastifyInstance) {
         return sendError(reply, ErrorCodes.NOT_FOUND, 'Photo not found', 404)
       }
 
+      const type = request.query.type ?? 'original'
+      if (type !== 'original' && type !== 'enhanced') {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, "Invalid type. Must be 'original' or 'enhanced'", 400)
+      }
+
       try {
         // Default 1 hour, max 7 days
         const expiresIn = Math.min(
@@ -156,10 +164,26 @@ export async function photoRoutes(fastify: FastifyInstance) {
           604800
         )
 
-        const signedUrl = await StorageService.getSignedUrl(photo.storagePath, expiresIn)
+        let signedUrl: string
+
+        if (type === 'enhanced') {
+          if (!photo.enhancedUrl) {
+            return sendError(reply, ErrorCodes.NOT_FOUND, 'Photo has not been enhanced yet', 404)
+          }
+          // Extract storage path from enhancedUrl
+          // Enhanced URL format: https://supabase.../storage/v1/object/public/photos/{userId}/enhanced/{photoId}-{nanoid}.{ext}
+          const enhancedPathMatch = photo.enhancedUrl.match(/\/photos\/(.+)$/)
+          if (!enhancedPathMatch?.[1]) {
+            return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Failed to parse enhanced URL', 500)
+          }
+          signedUrl = await StorageService.getSignedUrl(enhancedPathMatch[1], expiresIn)
+        } else {
+          signedUrl = await StorageService.getSignedUrl(photo.storagePath, expiresIn)
+        }
 
         return sendSuccess(reply, {
           signedUrl,
+          type,
           expiresIn,
           expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
         })
