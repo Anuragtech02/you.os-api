@@ -31,6 +31,11 @@ const envSchema = z.object({
   // Sync
   SYNC_COOLDOWN_MS: z.coerce.number().default(300000), // 5 minutes
   SYNC_TIMEOUT_MS: z.coerce.number().default(60000), // 60 seconds
+
+  // Email (Resend)
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().default('YOU.OS <noreply@youos.app>'),
+  FRONTEND_URL: z.string().url().default('https://youos.app'),
 })
 
 export type Env = z.infer<typeof envSchema>

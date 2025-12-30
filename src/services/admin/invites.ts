@@ -10,6 +10,7 @@ import { db } from '@/db/client'
 import { signupInviteTokens, type SignupInviteToken } from '@/db/schema'
 import { ApiError } from '@/utils/errors'
 import { ErrorCodes } from '@/utils/response'
+import * as EmailService from '@/services/email'
 
 /**
  * Create a new signup invite token
@@ -20,8 +21,9 @@ export async function createInviteToken(options: {
   expiresInDays?: number
   note?: string
   createdBy?: string
+  sendEmail?: boolean
 }): Promise<SignupInviteToken> {
-  const { email, maxUses = 1, expiresInDays = 7, note, createdBy } = options
+  const { email, maxUses = 1, expiresInDays = 7, note, createdBy, sendEmail = true } = options
 
   // Generate unique token
   const token = nanoid(32)
@@ -45,6 +47,21 @@ export async function createInviteToken(options: {
 
   if (!invite) {
     throw new ApiError(ErrorCodes.INTERNAL_ERROR, 'Failed to create invite token', 500)
+  }
+
+  // Send invite email if email is provided and sendEmail is true
+  if (email && sendEmail) {
+    try {
+      await EmailService.sendSignupInviteEmail({
+        email,
+        token,
+        expiresAt,
+        note: note || undefined,
+      })
+    } catch (err) {
+      // Log error but don't fail the invite creation
+      console.error('[SignupInvite] Failed to send invite email:', err)
+    }
   }
 
   return invite

@@ -5,11 +5,12 @@
  */
 
 import { db } from '@/db/client'
-import { companyInvites, companyCandidates, type CompanyInvite } from '@/db/schema/companies'
+import { companyInvites, companyCandidates, companies, type CompanyInvite } from '@/db/schema/companies'
 import { users } from '@/db/schema/users'
 import { eq, and, gt, desc } from 'drizzle-orm'
 import { ApiError } from '@/utils/errors'
 import { randomBytes } from 'crypto'
+import * as EmailService from '@/services/email'
 
 // Invite expiration: 7 days
 const INVITE_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000
@@ -101,8 +102,24 @@ export async function sendInvite(
     })
     .returning()
 
-  // TODO: Send email via Resend
-  // await sendInviteEmail(email, invite, company)
+  // Send invite email
+  try {
+    // Get company and inviter info for email
+    const [company] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, companyId)).limit(1)
+    const [inviter] = await db.select({ fullName: users.fullName }).from(users).where(eq(users.id, invitedBy)).limit(1)
+
+    await EmailService.sendCompanyInviteEmail({
+      email,
+      companyName: company?.name || 'the company',
+      inviterName: inviter?.fullName || 'A team member',
+      role: data.role || 'employee',
+      token,
+      expiresAt,
+    })
+  } catch (err) {
+    // Log error but don't fail the invite creation
+    console.error('[CompanyInvite] Failed to send invite email:', err)
+  }
 
   return invite!
 }
@@ -284,8 +301,24 @@ export async function resendInvite(companyId: string, inviteId: string): Promise
     .where(eq(companyInvites.id, inviteId))
     .returning()
 
-  // TODO: Send email via Resend
-  // await sendInviteEmail(invite.email, updatedInvite, company)
+  // Send invite email
+  try {
+    // Get company and inviter info for email
+    const [company] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, companyId)).limit(1)
+    const [inviter] = await db.select({ fullName: users.fullName }).from(users).where(eq(users.id, invite.invitedBy)).limit(1)
+
+    await EmailService.sendCompanyInviteEmail({
+      email: invite.email,
+      companyName: company?.name || 'the company',
+      inviterName: inviter?.fullName || 'A team member',
+      role: invite.role,
+      token,
+      expiresAt,
+    })
+  } catch (err) {
+    // Log error but don't fail the resend
+    console.error('[CompanyInvite] Failed to resend invite email:', err)
+  }
 
   return updatedInvite!
 }
