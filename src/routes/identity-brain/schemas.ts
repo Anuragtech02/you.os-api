@@ -10,6 +10,8 @@ export const coreAttributesSchema = z.object({
   age: z.number().int().min(0).max(150).optional(),
   location: z.string().max(200).optional(),
   occupation: z.string().max(200).optional(),
+  headline: z.string().max(200).optional(),
+  shortBio: z.string().max(1000).optional(),
   interests: z.array(z.string().max(100)).max(50).optional(),
   values: z.array(z.string().max(100)).max(20).optional(),
   personality: z.array(z.string().max(100)).max(20).optional(),
