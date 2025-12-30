@@ -67,7 +67,9 @@ export async function photoRoutes(fastify: FastifyInstance) {
         uploadedFrom: 'api',
       })
 
-      return sendSuccess(reply, { photo }, 201)
+      // Return with signed URLs
+      const photoWithUrls = await PhotoService.withSignedUrls(photo)
+      return sendSuccess(reply, { photo: photoWithUrls }, 201)
     } catch (error) {
       if (error instanceof Error && error.name === 'ApiError') {
         const apiError = error as { statusCode?: number; code?: string; message: string }
@@ -97,9 +99,12 @@ export async function photoRoutes(fastify: FastifyInstance) {
         sortBy: query.sortBy,
       })
 
+      // Return with signed URLs
+      const photosWithUrls = await PhotoService.withSignedUrlsBatch(photos)
+
       return sendSuccess(
         reply,
-        { photos },
+        { photos: photosWithUrls },
         200,
         {
           total,
@@ -128,7 +133,9 @@ export async function photoRoutes(fastify: FastifyInstance) {
         return sendError(reply, ErrorCodes.NOT_FOUND, 'Photo not found', 404)
       }
 
-      return sendSuccess(reply, { photo })
+      // Return with signed URLs
+      const photoWithUrls = await PhotoService.withSignedUrls(photo)
+      return sendSuccess(reply, { photo: photoWithUrls })
     }
   )
 
@@ -237,7 +244,9 @@ export async function photoRoutes(fastify: FastifyInstance) {
 
       try {
         const photo = await PhotoService.analyzePhoto(request.params.id, request.user!.id)
-        return sendSuccess(reply, { photo })
+        // Return with signed URLs
+        const photoWithUrls = await PhotoService.withSignedUrls(photo)
+        return sendSuccess(reply, { photo: photoWithUrls })
       } catch (error) {
         if (error instanceof Error && error.name === 'ApiError') {
           const apiError = error as { statusCode?: number; code?: string; message: string }
@@ -266,7 +275,9 @@ export async function photoRoutes(fastify: FastifyInstance) {
 
       try {
         const photo = await PhotoService.enhancePhoto(request.params.id, request.user!.id, options)
-        return sendSuccess(reply, { photo })
+        // Return with signed URLs
+        const photoWithUrls = await PhotoService.withSignedUrls(photo)
+        return sendSuccess(reply, { photo: photoWithUrls })
       } catch (error) {
         if (error instanceof Error && error.name === 'ApiError') {
           const apiError = error as { statusCode?: number; code?: string; message: string }
@@ -307,8 +318,11 @@ export async function photoRoutes(fastify: FastifyInstance) {
         limit
       )
 
+      // Return with signed URLs
+      const photosWithUrls = await PhotoService.withSignedUrlsBatch(photos)
+
       return sendSuccess(reply, {
-        photos,
+        photos: photosWithUrls,
         persona: contextResult.data,
       })
     }
@@ -328,7 +342,9 @@ export async function photoRoutes(fastify: FastifyInstance) {
 
       try {
         const photo = await PhotoService.setPrimary(request.params.id, request.user!.id)
-        return sendSuccess(reply, { photo })
+        // Return with signed URLs
+        const photoWithUrls = await PhotoService.withSignedUrls(photo)
+        return sendSuccess(reply, { photo: photoWithUrls })
       } catch (error) {
         if (error instanceof Error && error.name === 'ApiError') {
           const apiError = error as { statusCode?: number; code?: string; message: string }
@@ -364,11 +380,13 @@ export async function photoRoutes(fastify: FastifyInstance) {
       // Handle primary separately
       if (updateResult.data.isPrimary) {
         const updated = await PhotoService.setPrimary(request.params.id, request.user!.id)
-        return sendSuccess(reply, { photo: updated })
+        const updatedWithUrls = await PhotoService.withSignedUrls(updated)
+        return sendSuccess(reply, { photo: updatedWithUrls })
       }
 
       // For now, just return the photo (visibility can be added later)
-      return sendSuccess(reply, { photo })
+      const photoWithUrls = await PhotoService.withSignedUrls(photo)
+      return sendSuccess(reply, { photo: photoWithUrls })
     }
   )
 

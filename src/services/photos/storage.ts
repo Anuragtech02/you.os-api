@@ -254,6 +254,42 @@ export async function checkBucketHealth(): Promise<boolean> {
   }
 }
 
+/**
+ * Extract storage path from a public/enhanced URL
+ * URL format: https://supabase.../storage/v1/object/public/photos/{path}
+ */
+export function extractStoragePathFromUrl(url: string): string | null {
+  const match = url.match(/\/photos\/(.+)$/)
+  return match?.[1] ?? null
+}
+
+/**
+ * Get signed URLs for a photo (original and optionally enhanced)
+ * Returns an object with signedOriginalUrl and optionally signedEnhancedUrl
+ */
+export async function getPhotoSignedUrls(
+  storagePath: string,
+  enhancedUrl: string | null,
+  expiresIn = SIGNED_URL_EXPIRY
+): Promise<{ signedOriginalUrl: string; signedEnhancedUrl: string | null }> {
+  const signedOriginalUrl = await getSignedUrl(storagePath, expiresIn)
+
+  let signedEnhancedUrl: string | null = null
+  if (enhancedUrl) {
+    const enhancedPath = extractStoragePathFromUrl(enhancedUrl)
+    if (enhancedPath) {
+      try {
+        signedEnhancedUrl = await getSignedUrl(enhancedPath, expiresIn)
+      } catch {
+        // If enhanced URL fails, just return null
+        console.warn('Failed to get signed URL for enhanced photo')
+      }
+    }
+  }
+
+  return { signedOriginalUrl, signedEnhancedUrl }
+}
+
 // Export configuration for reference
 export const STORAGE_CONFIG = {
   bucket: STORAGE_BUCKET,

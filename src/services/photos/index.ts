@@ -469,5 +469,37 @@ export async function analyzeAllPending(userId: string): Promise<{ analyzed: num
   return { analyzed, failed }
 }
 
+// ============================================
+// Photo Serialization with Signed URLs
+// ============================================
+
+export interface PhotoWithSignedUrls extends Omit<Photo, 'originalUrl' | 'enhancedUrl'> {
+  originalUrl: string // signed URL
+  enhancedUrl: string | null // signed URL or null
+}
+
+/**
+ * Add signed URLs to a single photo
+ */
+export async function withSignedUrls(photo: Photo): Promise<PhotoWithSignedUrls> {
+  const { signedOriginalUrl, signedEnhancedUrl } = await StorageService.getPhotoSignedUrls(
+    photo.storagePath,
+    photo.enhancedUrl
+  )
+
+  return {
+    ...photo,
+    originalUrl: signedOriginalUrl,
+    enhancedUrl: signedEnhancedUrl,
+  }
+}
+
+/**
+ * Add signed URLs to multiple photos
+ */
+export async function withSignedUrlsBatch(photoList: Photo[]): Promise<PhotoWithSignedUrls[]> {
+  return Promise.all(photoList.map((photo) => withSignedUrls(photo)))
+}
+
 // Export sub-services
 export * as Storage from './storage'
