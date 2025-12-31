@@ -6,12 +6,14 @@
 
 import type { FastifyInstance } from 'fastify'
 import * as PhotoService from '@/services/photos'
+import * as OptimizationService from '@/services/photos/optimization'
 import * as StorageService from '@/services/photos/storage'
 import { ErrorCodes, sendError, sendSuccess } from '@/utils/response'
 import {
   categoryUpdateSchema,
   enhancementOptionsSchema,
   listPhotosQuerySchema,
+  optimizationPresetSchema,
   personaContextSchema,
   photoIdSchema,
 } from './schemas'
@@ -286,6 +288,153 @@ export async function photoRoutes(fastify: FastifyInstance) {
         fastify.log.error(error, 'Photo optimization error')
         return sendError(reply, ErrorCodes.AI_SERVICE_ERROR, 'Failed to optimize photo', 500)
       }
+    }
+  )
+
+  // =========================================
+  // Identity Optimization (New 3-Preset System)
+  // =========================================
+
+  /**
+   * POST /photos/:id/optimize-all - Generate all 3 optimization variants
+   * This is the main optimization flow - creates professional, attractive, and neutral versions
+   */
+  fastify.post<{ Params: { id: string } }>(
+    '/:id/optimize-all',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const idResult = photoIdSchema.safeParse(request.params.id)
+      if (!idResult.success) {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid photo ID', 400)
+      }
+
+      try {
+        const result = await OptimizationService.optimizeAll(request.params.id, request.user!.id)
+        const photoWithUrls = await PhotoService.withSignedUrls(result.photo)
+
+        return sendSuccess(reply, {
+          photo: photoWithUrls,
+          optimizations: result.optimizations.map((opt) => ({
+            id: opt.id,
+            preset: opt.preset,
+            url: opt.url, // TODO: Add signed URL support for optimizations
+            details: opt.details,
+            createdAt: opt.createdAt,
+          })),
+          message: 'Photo optimized with all 3 presets',
+        })
+      } catch (error) {
+        if (error instanceof Error && error.name === 'ApiError') {
+          const apiError = error as { statusCode?: number; code?: string; message: string }
+          return sendError(reply, apiError.code ?? ErrorCodes.AI_SERVICE_ERROR, apiError.message, apiError.statusCode ?? 500)
+        }
+        fastify.log.error(error, 'Photo optimization-all error')
+        return sendError(reply, ErrorCodes.AI_SERVICE_ERROR, 'Failed to optimize photo', 500)
+      }
+    }
+  )
+
+  /**
+   * POST /photos/:id/optimize/:preset - Generate a specific optimization variant
+   * Presets: professional, attractive, neutral
+   */
+  fastify.post<{ Params: { id: string; preset: string } }>(
+    '/:id/optimize/:preset',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const idResult = photoIdSchema.safeParse(request.params.id)
+      if (!idResult.success) {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid photo ID', 400)
+      }
+
+      const presetResult = optimizationPresetSchema.safeParse(request.params.preset)
+      if (!presetResult.success) {
+        return sendError(
+          reply,
+          ErrorCodes.VALIDATION_ERROR,
+          'Invalid preset. Must be: professional, attractive, or neutral',
+          400
+        )
+      }
+
+      try {
+        const optimization = await OptimizationService.optimizeWithPreset(
+          request.params.id,
+          request.user!.id,
+          presetResult.data
+        )
+
+        return sendSuccess(reply, {
+          optimization: {
+            id: optimization.id,
+            preset: optimization.preset,
+            url: optimization.url,
+            details: optimization.details,
+            createdAt: optimization.createdAt,
+          },
+        }, 201)
+      } catch (error) {
+        if (error instanceof Error && error.name === 'ApiError') {
+          const apiError = error as { statusCode?: number; code?: string; message: string }
+          return sendError(reply, apiError.code ?? ErrorCodes.AI_SERVICE_ERROR, apiError.message, apiError.statusCode ?? 500)
+        }
+        fastify.log.error(error, 'Photo optimization error')
+        return sendError(reply, ErrorCodes.AI_SERVICE_ERROR, 'Failed to optimize photo', 500)
+      }
+    }
+  )
+
+  /**
+   * GET /photos/:id/optimizations - Get all optimization variants for a photo
+   */
+  fastify.get<{ Params: { id: string } }>(
+    '/:id/optimizations',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const idResult = photoIdSchema.safeParse(request.params.id)
+      if (!idResult.success) {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid photo ID', 400)
+      }
+
+      // Verify photo belongs to user
+      const photo = await PhotoService.getByIdForUser(request.params.id, request.user!.id)
+      if (!photo) {
+        return sendError(reply, ErrorCodes.NOT_FOUND, 'Photo not found', 404)
+      }
+
+      const optimizations = await OptimizationService.getOptimizations(request.params.id)
+
+      return sendSuccess(reply, {
+        photoId: request.params.id,
+        optimizations: optimizations.map((opt) => ({
+          id: opt.id,
+          preset: opt.preset,
+          url: opt.url,
+          details: opt.details,
+          createdAt: opt.createdAt,
+        })),
+        isFullyOptimized: optimizations.length === 3,
+      })
+    }
+  )
+
+  /**
+   * GET /photos/optimization-presets - Get available optimization presets and their descriptions
+   */
+  fastify.get(
+    '/optimization-presets',
+    { preHandler: [fastify.authenticate] },
+    async (_request, reply) => {
+      const configs = OptimizationService.getAllPresetConfigs()
+
+      return sendSuccess(reply, {
+        presets: Object.entries(configs).map(([key, config]) => ({
+          id: key,
+          name: config.name,
+          description: config.description,
+          adjustments: config.adjustments,
+        })),
+      })
     }
   )
 

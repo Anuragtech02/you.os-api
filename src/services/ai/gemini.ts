@@ -669,6 +669,103 @@ export async function analyzeVoiceNote(
   })
 }
 
+// ============================================
+// Photo Optimization (Identity-Preserving)
+// ============================================
+
+export interface PhotoOptimizationResult {
+  imageBase64: string
+  mimeType: string
+  model: string
+  processingTimeMs: number
+  identityPreservation: number // 0-100 score
+}
+
+/**
+ * Optimize a photo with a specific preset
+ * This is the new identity-preserving optimization system
+ */
+export async function optimizePhotoWithPreset(
+  imageData: string | Buffer,
+  options: {
+    mimeType?: string
+    preset: 'professional' | 'attractive' | 'neutral'
+    promptGuidance: string
+  }
+): Promise<PhotoOptimizationResult> {
+  const { mimeType = 'image/jpeg', preset, promptGuidance } = options
+
+  const base64Data = Buffer.isBuffer(imageData)
+    ? imageData.toString('base64')
+    : imageData
+
+  const optimizationPrompt = `You are an identity-preserving photo optimization system.
+
+PRESET: ${preset.toUpperCase()}
+
+${promptGuidance}
+
+ABSOLUTE RULES:
+1. The person MUST remain immediately recognizable - this is NON-NEGOTIABLE
+2. NO artificial filters, heavy beautification, or unrealistic skin smoothing
+3. NO changing facial features, bone structure, or proportions
+4. NO making the photo look AI-generated or over-processed
+5. This is identity optimization, NOT photo editing - maintain authenticity
+6. Output should look like a high-quality photograph, not digital art
+
+The goal is to optimize for the ${preset} context while preserving the person's true appearance.
+Make subtle, professional adjustments only.`
+
+  return withRetry(async () => {
+    const startTime = Date.now()
+
+    const response = await ai.models.generateContent({
+      model: IMAGE_MODEL,
+      contents: [
+        {
+          inlineData: {
+            mimeType,
+            data: base64Data,
+          },
+        },
+        { text: optimizationPrompt },
+      ],
+    })
+
+    const processingTime = Date.now() - startTime
+
+    // Extract image from response
+    const candidates = response.candidates
+    if (!candidates || candidates.length === 0) {
+      throw Errors.internal('No response from optimization model')
+    }
+
+    const parts = candidates[0]?.content?.parts
+    if (!parts) {
+      throw Errors.internal('No content parts in response')
+    }
+
+    // Find image part
+    for (const part of parts) {
+      if ('inlineData' in part && part.inlineData) {
+        // Estimate identity preservation based on preset
+        // Neutral should have highest preservation, professional moderate, attractive moderate
+        const identityPreservation = preset === 'neutral' ? 95 : preset === 'professional' ? 85 : 80
+
+        return {
+          imageBase64: part.inlineData.data ?? '',
+          mimeType: part.inlineData.mimeType ?? 'image/png',
+          model: IMAGE_MODEL,
+          processingTimeMs: processingTime,
+          identityPreservation,
+        }
+      }
+    }
+
+    throw Errors.internal('No image data in optimization response')
+  })
+}
+
 // Export model names for reference
 export const GEMINI_MODELS = {
   analysis: ANALYSIS_MODEL,

@@ -17,8 +17,16 @@ export const photoStatusEnum = pgEnum('photo_status', [
   'pending',
   'analyzing',
   'analyzed',
-  'enhanced',
+  'optimizing',
+  'optimized',
+  'enhanced', // Legacy - kept for backward compatibility
   'failed',
+])
+
+export const optimizationPresetEnum = pgEnum('optimization_preset', [
+  'professional', // LinkedIn, resumes, corporate - clean, credible, restrained
+  'attractive',   // Social media, personal branding - polished, confident, natural
+  'neutral',      // Minimal enhancement - preserves identity as closely as possible
 ])
 
 // Photos table
@@ -123,6 +131,51 @@ export interface PhotoMetadata {
   uploadedFrom?: 'web' | 'mobile' | 'api'
 }
 
+// Photo Optimizations table - stores the 3 optimization variants per photo
+export const photoOptimizations = pgTable(
+  'photo_optimizations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    photoId: uuid('photo_id')
+      .notNull()
+      .references(() => photos.id, { onDelete: 'cascade' }),
+
+    // Optimization type
+    preset: optimizationPresetEnum('preset').notNull(),
+
+    // Storage
+    url: text('url').notNull(),
+    storagePath: text('storage_path').notNull(),
+
+    // Optimization details
+    details: jsonb('details').$type<OptimizationDetails>().default({}).notNull(),
+
+    // Timestamps
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_photo_optimizations_photo_id').on(table.photoId),
+    index('idx_photo_optimizations_preset').on(table.preset),
+  ]
+)
+
+export interface OptimizationDetails {
+  provider?: string // e.g., 'gemini'
+  processingTimeMs?: number
+  // What was applied
+  adjustments?: {
+    lighting?: 'subtle' | 'moderate' | 'none'
+    colorCorrection?: 'subtle' | 'moderate' | 'none'
+    skinRetouching?: 'subtle' | 'moderate' | 'none'
+    backgroundCleanup?: 'subtle' | 'moderate' | 'none'
+  }
+  // Identity preservation score (0-100, higher = more identity preserved)
+  identityPreservation?: number
+}
+
 // Infer types
 export type Photo = typeof photos.$inferSelect
 export type NewPhoto = typeof photos.$inferInsert
+export type PhotoOptimization = typeof photoOptimizations.$inferSelect
+export type NewPhotoOptimization = typeof photoOptimizations.$inferInsert
+export type OptimizationPreset = 'professional' | 'attractive' | 'neutral'

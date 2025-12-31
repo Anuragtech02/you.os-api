@@ -24,6 +24,9 @@ export const listPhotosQuerySchema = z.object({
 // Persona context schema
 export const personaContextSchema = z.enum(['professional', 'dating', 'social', 'private'])
 
+// Optimization preset schema
+export const optimizationPresetSchema = z.enum(['professional', 'attractive', 'neutral'])
+
 // Enhancement options schema
 export const enhancementOptionsSchema = z.object({
   enhanceLighting: z.boolean().default(true),

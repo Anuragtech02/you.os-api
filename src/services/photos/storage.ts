@@ -213,6 +213,42 @@ export async function deletePhoto(storagePath: string): Promise<void> {
 }
 
 /**
+ * Upload an optimized version of a photo (for the new 3-preset system)
+ */
+export async function uploadOptimizedPhoto(
+  userId: string,
+  photoId: string,
+  preset: 'professional' | 'attractive' | 'neutral',
+  imageData: Buffer,
+  mimeType = 'image/png'
+): Promise<{ storagePath: string; publicUrl: string }> {
+  const ext = mimeType === 'image/png' ? 'png' : 'jpg'
+  const storagePath = `${userId}/optimized/${preset}/${photoId}-${nanoid(6)}.${ext}`
+
+  try {
+    const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(storagePath, imageData, {
+      contentType: mimeType,
+      upsert: true,
+    })
+
+    if (error) {
+      throw Errors.internal(`Failed to upload optimized photo: ${error.message}`)
+    }
+
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath)
+
+    return { storagePath, publicUrl }
+  } catch (error) {
+    if (error instanceof Error && error.name === 'ApiError') {
+      throw error
+    }
+    throw Errors.internal('Failed to upload optimized photo')
+  }
+}
+
+/**
  * Delete multiple photos from storage
  */
 export async function deletePhotos(storagePaths: string[]): Promise<void> {
