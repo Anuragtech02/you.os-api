@@ -21,7 +21,7 @@ export type PersonaType = 'professional' | 'dating' | 'social' | 'private'
  * Standard tone weight dimensions used across all personas
  * Each value is on a 0-1 scale
  */
-interface ToneWeights {
+interface ToneWeights extends Record<string, number> {
   confident: number
   friendly: number
   witty: number

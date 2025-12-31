@@ -660,12 +660,17 @@ export function getDocumentSpecs() {
 // ============================================
 
 function parseArrayResponse<T>(text: string): T[] {
+  if (!text || text.trim() === '') {
+    return []
+  }
+
   try {
     let cleanText = text.trim()
+
+    // Remove markdown code blocks
     if (cleanText.startsWith('```json')) {
       cleanText = cleanText.slice(7)
-    }
-    if (cleanText.startsWith('```')) {
+    } else if (cleanText.startsWith('```')) {
       cleanText = cleanText.slice(3)
     }
     if (cleanText.endsWith('```')) {
@@ -673,21 +678,31 @@ function parseArrayResponse<T>(text: string): T[] {
     }
     cleanText = cleanText.trim()
 
+    // Try to extract JSON array if wrapped in other text
+    const jsonMatch = cleanText.match(/\[[\s\S]*\]/)
+    if (jsonMatch) {
+      cleanText = jsonMatch[0]
+    }
+
     const parsed = JSON.parse(cleanText)
     return Array.isArray(parsed) ? parsed : []
   } catch {
-    console.error('Failed to parse array response')
     return []
   }
 }
 
 function parseObjectResponse<T>(text: string): Partial<T> {
+  if (!text || text.trim() === '') {
+    return {}
+  }
+
   try {
     let cleanText = text.trim()
+
+    // Remove markdown code blocks
     if (cleanText.startsWith('```json')) {
       cleanText = cleanText.slice(7)
-    }
-    if (cleanText.startsWith('```')) {
+    } else if (cleanText.startsWith('```')) {
       cleanText = cleanText.slice(3)
     }
     if (cleanText.endsWith('```')) {
@@ -695,9 +710,14 @@ function parseObjectResponse<T>(text: string): Partial<T> {
     }
     cleanText = cleanText.trim()
 
+    // Try to extract JSON object if wrapped in other text
+    const jsonMatch = cleanText.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      cleanText = jsonMatch[0]
+    }
+
     return JSON.parse(cleanText)
   } catch {
-    console.error('Failed to parse object response')
     return {}
   }
 }

@@ -2,7 +2,7 @@
  * Gemini AI Service
  *
  * Provides image analysis and generation capabilities using Google's Gemini models.
- * - Image Analysis: gemini-2.5-flash
+ * - Text/Analysis: gemini-3-flash-preview (latest)
  * - Image Generation/Editing: gemini-2.5-flash-image (Nano Banana)
  */
 
@@ -19,7 +19,7 @@ const ai = new GoogleGenAI({ apiKey: env.GOOGLE_AI_API_KEY })
 const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY })
 
 // Model configuration
-const ANALYSIS_MODEL = 'gemini-2.5-flash'
+const ANALYSIS_MODEL = 'gemini-3-flash-preview'
 const IMAGE_MODEL = 'gemini-2.5-flash-image'
 const FALLBACK_MODEL = 'gpt-5-mini' // GPT-5 Mini fallback for rate limits
 
@@ -467,8 +467,22 @@ export async function generateText(
         },
       })
 
+      // Try to extract text, falling back to candidates if needed
+      let text = response.text ?? ''
+      if (!text && response.candidates && response.candidates.length > 0) {
+        const parts = response.candidates[0]?.content?.parts
+        if (parts && parts.length > 0) {
+          for (const part of parts) {
+            if ('text' in part && part.text) {
+              text = part.text
+              break
+            }
+          }
+        }
+      }
+
       return {
-        text: response.text ?? '',
+        text,
         model: ANALYSIS_MODEL,
       }
     })

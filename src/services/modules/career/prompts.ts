@@ -143,7 +143,7 @@ ${targetRole ? `- Target Role: ${targetRole}` : '- General professional summary'
 
 ${customInstructions ? `## Additional Instructions:\n${customInstructions}` : ''}
 
-Return ONLY a JSON array with this structure:
+Return as JSON array:
 [
   {
     "summary": "The full summary text",
@@ -152,7 +152,9 @@ Return ONLY a JSON array with this structure:
   }
 ]
 
-Generate 3 distinct variations with different angles.`
+Generate 3 distinct variations with different angles.
+
+Return ONLY valid JSON, no markdown code blocks.`
 
   return prompt
 }
@@ -194,7 +196,7 @@ ${targetRole ? `## Target Role: ${targetRole}` : ''}
 
 ${customInstructions ? `## Additional Instructions:\n${customInstructions}` : ''}
 
-Return ONLY a JSON array with this structure:
+Return as JSON array:
 [
   {
     "bullet": "The bullet point text",
@@ -204,7 +206,9 @@ Return ONLY a JSON array with this structure:
   }
 ]
 
-Generate 6-8 strong bullet points covering different aspects of experience.`
+Generate 6-8 strong bullet points covering different aspects of experience.
+
+Return ONLY valid JSON, no markdown code blocks.`
 
   return prompt
 }
@@ -247,12 +251,14 @@ ${jobDescription ? `- Job Description:\n${jobDescription}` : ''}
 
 ${customInstructions ? `## Additional Instructions:\n${customInstructions}` : ''}
 
-Return ONLY a JSON object with this structure:
+Return as JSON object:
 {
   "coverLetter": "The full cover letter text",
   "keyPoints": ["Point 1 highlighted", "Point 2 highlighted", ...],
   "wordCount": <number>
-}`
+}
+
+Return ONLY valid JSON, no markdown code blocks.`
 
   return prompt
 }
@@ -288,7 +294,7 @@ ${keywords?.join(', ') || 'Relevant industry keywords'}
 
 ${customInstructions ? `## Additional Instructions:\n${customInstructions}` : ''}
 
-Return ONLY a JSON array with this structure:
+Return as JSON array:
 [
   {
     "headline": "The headline text (max 120 chars)",
@@ -298,7 +304,9 @@ Return ONLY a JSON array with this structure:
   }
 ]
 
-Generate 5 distinct headline options with different approaches.`
+Generate 5 distinct headline options with different approaches.
+
+Return ONLY valid JSON, no markdown code blocks.`
 
   return prompt
 }
@@ -343,7 +351,7 @@ ${keywords?.join(', ') || 'Industry-relevant keywords'}
 
 ${customInstructions ? `## Additional Instructions:\n${customInstructions}` : ''}
 
-Return ONLY a JSON array with this structure:
+Return as JSON array:
 [
   {
     "summary": "The full LinkedIn summary",
@@ -353,7 +361,9 @@ Return ONLY a JSON array with this structure:
   }
 ]
 
-Generate 2 distinct variations.`
+Generate 2 distinct variations.
+
+Return ONLY valid JSON, no markdown code blocks.`
 
   return prompt
 }
@@ -406,7 +416,7 @@ export function buildElevatorPitchPrompt(options: ElevatorPitchOptions): string 
 
 ${customInstructions ? `## Additional Instructions:\n${customInstructions}` : ''}
 
-Return ONLY a JSON array with this structure:
+Return as JSON array:
 [
   {
     "pitch": "The full elevator pitch text",
@@ -416,7 +426,9 @@ Return ONLY a JSON array with this structure:
   }
 ]
 
-Generate 3 distinct variations.`
+Generate 3 distinct variations.
+
+Return ONLY valid JSON, no markdown code blocks.`
 
   return prompt
 }
