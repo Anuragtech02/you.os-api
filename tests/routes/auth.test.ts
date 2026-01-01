@@ -514,6 +514,155 @@ describe('Auth Routes', () => {
   })
 
   // =========================================
+  // POST /auth/change-password
+  // =========================================
+  describe('POST /auth/change-password', () => {
+    const endpoint = '/api/v1/auth/change-password'
+    let changePasswordUser: TestUser
+
+    beforeAll(async () => {
+      changePasswordUser = await createTestUser(
+        `test-change-password-${Date.now()}@example.com`,
+        'Test123456',
+        'Change Password Test User'
+      )
+    })
+
+    afterAll(async () => {
+      if (changePasswordUser) {
+        await deleteTestUser(changePasswordUser.authId)
+      }
+    })
+
+    it('should require authentication', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: endpoint,
+        payload: {
+          currentPassword: 'Test123456',
+          newPassword: 'NewTest123456',
+        },
+      })
+
+      expect(response.statusCode).toBe(401)
+    })
+
+    it('should reject with incorrect current password', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: endpoint,
+        headers: {
+          authorization: `Bearer ${changePasswordUser.accessToken}`,
+        },
+        payload: {
+          currentPassword: 'WrongPassword123',
+          newPassword: 'NewTest123456',
+        },
+      })
+
+      const body = response.json()
+
+      expect(response.statusCode).toBe(401)
+      expect(body.success).toBe(false)
+    })
+
+    it('should reject weak new password (too short)', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: endpoint,
+        headers: {
+          authorization: `Bearer ${changePasswordUser.accessToken}`,
+        },
+        payload: {
+          currentPassword: 'Test123456',
+          newPassword: 'Aa1',
+        },
+      })
+
+      const body = response.json()
+
+      expect(response.statusCode).toBe(400)
+      expect(body.success).toBe(false)
+      expect(body.error.code).toBe('VALIDATION_ERROR')
+    })
+
+    it('should reject new password missing uppercase', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: endpoint,
+        headers: {
+          authorization: `Bearer ${changePasswordUser.accessToken}`,
+        },
+        payload: {
+          currentPassword: 'Test123456',
+          newPassword: 'newpassword123',
+        },
+      })
+
+      const body = response.json()
+
+      expect(response.statusCode).toBe(400)
+      expect(body.success).toBe(false)
+    })
+
+    it('should reject new password missing number', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: endpoint,
+        headers: {
+          authorization: `Bearer ${changePasswordUser.accessToken}`,
+        },
+        payload: {
+          currentPassword: 'Test123456',
+          newPassword: 'NewPassword',
+        },
+      })
+
+      const body = response.json()
+
+      expect(response.statusCode).toBe(400)
+      expect(body.success).toBe(false)
+    })
+
+    it('should change password successfully with valid credentials', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: endpoint,
+        headers: {
+          authorization: `Bearer ${changePasswordUser.accessToken}`,
+        },
+        payload: {
+          currentPassword: 'Test123456',
+          newPassword: 'NewTest123456',
+        },
+      })
+
+      const body = response.json()
+
+      expect(response.statusCode).toBe(200)
+      expect(body.success).toBe(true)
+      expect(body.data.message).toContain('Password changed successfully')
+    })
+
+    it('should allow login with new password', async () => {
+      const loginResponse = await app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/login',
+        payload: {
+          email: changePasswordUser.email,
+          password: 'NewTest123456',
+        },
+      })
+
+      const body = loginResponse.json()
+
+      expect(loginResponse.statusCode).toBe(200)
+      expect(body.success).toBe(true)
+      expect(body.data.session.accessToken).toBeDefined()
+    })
+  })
+
+  // =========================================
   // POST /auth/logout
   // =========================================
   describe('POST /auth/logout', () => {

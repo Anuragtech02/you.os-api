@@ -27,6 +27,7 @@ export const generateBioSchema = z.object({
   customInstructions: z.string().max(500).optional(),
   variations: z.number().min(1).max(5).default(3),
   saveToHistory: z.boolean().default(true),
+  companyId: z.string().uuid().optional(),
 })
 
 // Generate dating prompt answer schema
@@ -34,6 +35,7 @@ export const generateDatingPromptSchema = z.object({
   promptQuestion: z.string().min(5).max(200),
   maxLength: z.number().min(50).max(500).default(150),
   saveToHistory: z.boolean().default(true),
+  companyId: z.string().uuid().optional(),
 })
 
 // Regenerate with feedback schema

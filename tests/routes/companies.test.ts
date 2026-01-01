@@ -399,6 +399,172 @@ describe('Company Routes', () => {
   })
 
   // =========================================
+  // GET /companies/:id/dashboard-stats - Dashboard stats
+  // =========================================
+  describe('GET /api/v1/companies/:id/dashboard-stats', () => {
+    it('should require authentication', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/companies/${testCompanyId}/dashboard-stats`,
+      })
+
+      expect(response.statusCode).toBe(401)
+    })
+
+    it('should return dashboard stats for owner', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/companies/${testCompanyId}/dashboard-stats`,
+        headers: {
+          authorization: `Bearer ${testUser.accessToken}`,
+        },
+      })
+
+      expect(response.statusCode).toBe(200)
+      const body = response.json()
+      expect(body.success).toBe(true)
+      expect(body.data.companyId).toBe(testCompanyId)
+      expect(body.data.totalMembers).toBeDefined()
+      expect(body.data.identityCompletionPercentage).toBeDefined()
+      expect(body.data.contentGenerated).toBeDefined()
+      expect(body.data.pendingInvitesCount).toBeDefined()
+    })
+
+    it('should return 403 for non-member', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/companies/${testCompanyId}/dashboard-stats`,
+        headers: {
+          authorization: `Bearer ${secondUser.accessToken}`,
+        },
+      })
+
+      expect(response.statusCode).toBe(403)
+    })
+  })
+
+  // =========================================
+  // GET /companies/:id/activity - Activity feed
+  // =========================================
+  describe('GET /api/v1/companies/:id/activity', () => {
+    it('should require authentication', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/companies/${testCompanyId}/activity`,
+      })
+
+      expect(response.statusCode).toBe(401)
+    })
+
+    it('should return activity feed for member', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/companies/${testCompanyId}/activity`,
+        headers: {
+          authorization: `Bearer ${testUser.accessToken}`,
+        },
+      })
+
+      expect(response.statusCode).toBe(200)
+      const body = response.json()
+      expect(body.success).toBe(true)
+      expect(Array.isArray(body.data.activities)).toBe(true)
+      expect(body.meta).toBeDefined()
+    })
+
+    it('should support pagination', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/companies/${testCompanyId}/activity?limit=5&offset=0`,
+        headers: {
+          authorization: `Bearer ${testUser.accessToken}`,
+        },
+      })
+
+      expect(response.statusCode).toBe(200)
+      const body = response.json()
+      expect(body.data.activities.length).toBeLessThanOrEqual(5)
+    })
+
+    it('should return 403 for non-member', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/companies/${testCompanyId}/activity`,
+        headers: {
+          authorization: `Bearer ${secondUser.accessToken}`,
+        },
+      })
+
+      expect(response.statusCode).toBe(403)
+    })
+  })
+
+  // =========================================
+  // PATCH /companies/:id/brand-guidelines - Update brand guidelines
+  // =========================================
+  describe('PATCH /api/v1/companies/:id/brand-guidelines', () => {
+    it('should require authentication', async () => {
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/companies/${testCompanyId}/brand-guidelines`,
+        payload: { voiceTone: 'professional' },
+      })
+
+      expect(response.statusCode).toBe(401)
+    })
+
+    it('should update brand guidelines for owner', async () => {
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/companies/${testCompanyId}/brand-guidelines`,
+        headers: {
+          authorization: `Bearer ${testUser.accessToken}`,
+        },
+        payload: {
+          voiceTone: 'professional',
+          communicationStyle: 'formal',
+          industry: 'Technology',
+          toneAttributes: ['confident', 'innovative'],
+        },
+      })
+
+      expect(response.statusCode).toBe(200)
+      const body = response.json()
+      expect(body.success).toBe(true)
+      expect(body.data.brandGuidelines.voiceTone).toBe('professional')
+      expect(body.data.brandGuidelines.communicationStyle).toBe('formal')
+    })
+
+    it('should return 403 for non-owner', async () => {
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/companies/${testCompanyId}/brand-guidelines`,
+        headers: {
+          authorization: `Bearer ${secondUser.accessToken}`,
+        },
+        payload: { voiceTone: 'casual' },
+      })
+
+      expect(response.statusCode).toBe(403)
+    })
+
+    it('should validate brand guidelines values', async () => {
+      const response = await app.inject({
+        method: 'PATCH',
+        url: `/api/v1/companies/${testCompanyId}/brand-guidelines`,
+        headers: {
+          authorization: `Bearer ${testUser.accessToken}`,
+        },
+        payload: {
+          voiceTone: 'invalid-tone', // Not a valid enum value
+        },
+      })
+
+      expect(response.statusCode).toBe(400)
+    })
+  })
+
+  // =========================================
   // DELETE /companies/:id - Delete company
   // =========================================
   describe('DELETE /api/v1/companies/:id', () => {

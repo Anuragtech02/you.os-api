@@ -1,5 +1,14 @@
-import { boolean, index, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { boolean, index, jsonb, pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 import { users } from './users'
+
+// Enums
+export const companyActivityTypeEnum = pgEnum('company_activity_type', [
+  'member_joined',
+  'identity_completed',
+  'first_photo',
+  'first_bio',
+  'content_generated',
+])
 
 // Companies table (for B2B multi-tenant)
 export const companies = pgTable('companies', {
@@ -11,6 +20,7 @@ export const companies = pgTable('companies', {
   // Branding
   logoUrl: text('logo_url'),
   brandColors: jsonb('brand_colors').$type<BrandColors>().default({}).notNull(),
+  brandGuidelines: jsonb('brand_guidelines').$type<BrandGuidelines>(),
 
   // Settings
   settings: jsonb('settings').$type<CompanySettings>().default({}).notNull(),
@@ -97,11 +107,54 @@ export const companyInvites = pgTable(
   ]
 )
 
+// Company Activities table - tracks significant events for admin dashboard
+export const companyActivities = pgTable(
+  'company_activities',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+
+    // Activity details
+    type: companyActivityTypeEnum('type').notNull(),
+    metadata: jsonb('metadata').$type<CompanyActivityMetadata>().default({}).notNull(),
+
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_company_activities_company').on(table.companyId),
+    index('idx_company_activities_user').on(table.userId),
+    index('idx_company_activities_type').on(table.type),
+    index('idx_company_activities_created').on(table.createdAt),
+  ]
+)
+
 // Type definitions
 export interface BrandColors {
   primary?: string
   secondary?: string
   accent?: string
+}
+
+export interface BrandGuidelines {
+  voiceTone?: 'professional' | 'casual' | 'technical' | 'friendly'
+  toneAttributes?: string[]
+  industry?: string
+  targetAudience?: string
+  keyMessaging?: string
+  wordsToAvoid?: string[]
+  wordsToInclude?: string[]
+  communicationStyle?: 'formal' | 'informal' | 'balanced'
+}
+
+export interface CompanyActivityMetadata {
+  userName?: string
+  userAvatarUrl?: string
+  contentType?: string
+  platform?: string
+  details?: string
 }
 
 export interface CompanySettings {
@@ -126,3 +179,6 @@ export type CompanyCandidate = typeof companyCandidates.$inferSelect
 export type NewCompanyCandidate = typeof companyCandidates.$inferInsert
 export type CompanyInvite = typeof companyInvites.$inferSelect
 export type NewCompanyInvite = typeof companyInvites.$inferInsert
+export type CompanyActivity = typeof companyActivities.$inferSelect
+export type NewCompanyActivity = typeof companyActivities.$inferInsert
+export type CompanyActivityType = 'member_joined' | 'identity_completed' | 'first_photo' | 'first_bio' | 'content_generated'

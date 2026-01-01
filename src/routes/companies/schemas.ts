@@ -58,3 +58,31 @@ export const inviteListSchema = z.object({
 export const transferOwnershipSchema = z.object({
   newOwnerId: z.string().uuid(),
 })
+
+// Brand guidelines schema
+export const brandGuidelinesSchema = z.object({
+  voiceTone: z.enum(['professional', 'casual', 'technical', 'friendly']).optional(),
+  toneAttributes: z.array(z.string().max(50)).max(10).optional(),
+  industry: z.string().max(100).optional(),
+  targetAudience: z.string().max(500).optional(),
+  keyMessaging: z.string().max(1000).optional(),
+  wordsToAvoid: z.array(z.string().max(50)).max(20).optional(),
+  wordsToInclude: z.array(z.string().max(50)).max(20).optional(),
+  communicationStyle: z.enum(['formal', 'informal', 'balanced']).optional(),
+})
+
+// Activity type filter
+export const activityTypeSchema = z.enum([
+  'member_joined',
+  'identity_completed',
+  'first_photo',
+  'first_bio',
+  'content_generated',
+])
+
+// Activity feed query schema
+export const activityFeedQuerySchema = z.object({
+  limit: z.coerce.number().min(1).max(100).default(20),
+  offset: z.coerce.number().min(0).default(0),
+  type: activityTypeSchema.optional(),
+})

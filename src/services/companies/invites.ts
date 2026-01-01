@@ -11,6 +11,7 @@ import { eq, and, gt, desc } from 'drizzle-orm'
 import { ApiError } from '@/utils/errors'
 import { randomBytes } from 'crypto'
 import * as EmailService from '@/services/email'
+import { logActivity } from './stats'
 
 // Invite expiration: 7 days
 const INVITE_EXPIRATION_MS = 7 * 24 * 60 * 60 * 1000
@@ -201,6 +202,15 @@ export async function acceptInvite(
     .set({ status: 'accepted', acceptedBy: userId, acceptedAt: new Date() })
     .where(eq(companyInvites.id, invite.id))
     .returning()
+
+  // Log member joined activity
+  try {
+    await logActivity(invite.companyId, userId, 'member_joined', {
+      userName: user.email,
+    })
+  } catch (err) {
+    console.error('[CompanyInvite] Failed to log activity:', err)
+  }
 
   return { invite: acceptedInvite!, companyId: invite.companyId }
 }

@@ -9,6 +9,7 @@ import {
   companies,
   companyCandidates,
   type Company,
+  type BrandGuidelines,
 } from '@/db/schema/companies'
 import { eq, and } from 'drizzle-orm'
 import { ApiError } from '@/utils/errors'
@@ -208,6 +209,38 @@ export async function canUserManageCompany(userId: string, companyId: string): P
   return userRole.isOwner || userRole.role === 'admin'
 }
 
+/**
+ * Update brand guidelines for a company
+ */
+export async function updateBrandGuidelines(
+  companyId: string,
+  brandGuidelines: BrandGuidelines
+): Promise<Company> {
+  const [company] = await db
+    .update(companies)
+    .set({
+      brandGuidelines,
+      updatedAt: new Date(),
+    })
+    .where(eq(companies.id, companyId))
+    .returning()
+
+  if (!company) {
+    throw new ApiError('NOT_FOUND', 'Company not found', 404)
+  }
+
+  return company
+}
+
+/**
+ * Check if user is a member of a company
+ */
+export async function isUserMemberOfCompany(userId: string, companyId: string): Promise<boolean> {
+  const role = await getUserRoleInCompany(userId, companyId)
+  return role !== null
+}
+
 // Re-export related services
 export * from './employees'
 export * from './invites'
+export * from './stats'

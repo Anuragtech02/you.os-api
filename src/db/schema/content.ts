@@ -9,6 +9,7 @@ import {
   uuid,
   vector,
 } from 'drizzle-orm/pg-core'
+import { companies } from './companies'
 import { personas } from './identity-brain'
 import { users } from './users'
 
@@ -35,6 +36,7 @@ export const generatedContent = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     personaId: uuid('persona_id').references(() => personas.id, { onDelete: 'set null' }),
+    companyId: uuid('company_id').references(() => companies.id, { onDelete: 'set null' }),
 
     // Content
     contentType: contentTypeEnum('content_type').notNull(),
@@ -65,6 +67,7 @@ export const generatedContent = pgTable(
   },
   (table) => [
     index('idx_content_user_id').on(table.userId),
+    index('idx_content_company_id').on(table.companyId),
     index('idx_content_type').on(table.contentType),
     index('idx_content_platform').on(table.platform),
     index('idx_content_feedback').on(table.feedbackType),

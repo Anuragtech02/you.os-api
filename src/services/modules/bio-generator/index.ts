@@ -20,6 +20,7 @@ import {
 import { Errors } from '@/utils/errors'
 import * as GeminiService from '../../ai/gemini'
 import { buildBioPrompt, buildDatingPromptAnswerPrompt, PLATFORM_SPECS, type PlatformType } from './prompts'
+import { logActivity } from '../../companies/stats'
 
 // ============================================
 // Types
@@ -44,12 +45,14 @@ export interface GenerateBioOptions {
   customInstructions?: string
   variations?: number
   saveToHistory?: boolean
+  companyId?: string
 }
 
 export interface GenerateDatingPromptOptions {
   promptQuestion: string
   maxLength?: number
   saveToHistory?: boolean
+  companyId?: string
 }
 
 // ============================================
@@ -63,7 +66,7 @@ export async function generateBio(
   userId: string,
   options: GenerateBioOptions
 ): Promise<GenerationResult> {
-  const { platform, personaType, customInstructions, variations = 3, saveToHistory = true } = options
+  const { platform, personaType, customInstructions, variations = 3, saveToHistory = true, companyId } = options
 
   // Validate platform
   if (!PLATFORM_SPECS[platform]) {
@@ -171,10 +174,44 @@ export async function generateBio(
           persona: personaType,
           customInstructions,
         } as GenerationParams,
+        companyId: companyId ?? null,
       }
 
       const [saved] = await db.insert(generatedContent).values(newContent).returning()
       generationId = saved?.id
+
+      // Log activity if in company context
+      if (companyId && saved) {
+        try {
+          // Check if this is the user's first bio in this company
+          const existingBios = await db
+            .select({ id: generatedContent.id })
+            .from(generatedContent)
+            .where(
+              and(
+                eq(generatedContent.userId, userId),
+                eq(generatedContent.companyId, companyId)
+              )
+            )
+            .limit(2)
+
+          // Log first_bio if this is the user's first bio
+          if (existingBios.length === 1) {
+            await logActivity(companyId, userId, 'first_bio', {
+              contentType,
+              platform,
+            })
+          }
+
+          // Also log the content_generated activity
+          await logActivity(companyId, userId, 'content_generated', {
+            contentType,
+            platform,
+          })
+        } catch (err) {
+          console.error('[BioGenerator] Failed to log activity:', err)
+        }
+      }
     }
   }
 
@@ -193,7 +230,7 @@ export async function generateDatingPromptAnswer(
   userId: string,
   options: GenerateDatingPromptOptions
 ): Promise<GenerationResult> {
-  const { promptQuestion, maxLength = 150, saveToHistory = true } = options
+  const { promptQuestion, maxLength = 150, saveToHistory = true, companyId } = options
 
   // Get user's identity brain
   const [brain] = await db
@@ -251,10 +288,44 @@ export async function generateDatingPromptAnswer(
           temperature: 0.85,
           customInstructions: promptQuestion,
         } as GenerationParams,
+        companyId: companyId ?? null,
       }
 
       const [saved] = await db.insert(generatedContent).values(newContent).returning()
       generationId = saved?.id
+
+      // Log activity if in company context
+      if (companyId && saved) {
+        try {
+          // Check if this is the user's first bio in this company
+          const existingBios = await db
+            .select({ id: generatedContent.id })
+            .from(generatedContent)
+            .where(
+              and(
+                eq(generatedContent.userId, userId),
+                eq(generatedContent.companyId, companyId)
+              )
+            )
+            .limit(2)
+
+          // Log first_bio if this is the user's first bio
+          if (existingBios.length === 1) {
+            await logActivity(companyId, userId, 'first_bio', {
+              contentType: 'dating_prompt',
+              platform: 'hinge',
+            })
+          }
+
+          // Also log the content_generated activity
+          await logActivity(companyId, userId, 'content_generated', {
+            contentType: 'dating_prompt',
+            platform: 'hinge',
+          })
+        } catch (err) {
+          console.error('[BioGenerator] Failed to log activity:', err)
+        }
+      }
     }
   }
 

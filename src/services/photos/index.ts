@@ -19,6 +19,7 @@ import {
 import { Errors } from '@/utils/errors'
 import * as GeminiService from '../ai/gemini'
 import * as StorageService from './storage'
+import { logActivity } from '../companies/stats'
 
 // ============================================
 // Photo CRUD Operations
@@ -33,8 +34,9 @@ export async function createPhoto(data: {
   mimeType: string
   originalFilename: string
   uploadedFrom?: 'web' | 'mobile' | 'api'
+  companyId?: string
 }): Promise<Photo> {
-  const { userId, fileData, mimeType, originalFilename, uploadedFrom = 'web' } = data
+  const { userId, fileData, mimeType, originalFilename, uploadedFrom = 'web', companyId } = data
 
   // Upload to storage
   const uploadResult = await StorageService.uploadPhoto(userId, fileData, mimeType, originalFilename)
@@ -42,6 +44,7 @@ export async function createPhoto(data: {
   // Create database record
   const newPhoto: NewPhoto = {
     userId,
+    companyId: companyId ?? null,
     originalUrl: uploadResult.publicUrl,
     storagePath: uploadResult.storagePath,
     status: 'pending',
@@ -57,6 +60,31 @@ export async function createPhoto(data: {
 
   if (!photo) {
     throw Errors.internal('Failed to create photo record')
+  }
+
+  // Log first_photo activity if this is user's first photo in company context
+  if (companyId) {
+    try {
+      // Check if this is the user's first photo in this company
+      const existingPhotos = await db
+        .select({ id: photos.id })
+        .from(photos)
+        .where(
+          and(
+            eq(photos.userId, userId),
+            eq(photos.companyId, companyId),
+            isNull(photos.deletedAt)
+          )
+        )
+        .limit(2)
+
+      // If only one photo (the one we just created), log the activity
+      if (existingPhotos.length === 1) {
+        await logActivity(companyId, userId, 'first_photo', {})
+      }
+    } catch (err) {
+      console.error('[PhotoService] Failed to log first_photo activity:', err)
+    }
   }
 
   return photo
@@ -98,14 +126,23 @@ export async function listByUser(
     offset?: number
     status?: string
     sortBy?: 'createdAt' | 'overallScore'
+    companyId?: string
   } = {}
 ): Promise<{ photos: Photo[]; total: number }> {
-  const { limit = 20, offset = 0, status, sortBy = 'createdAt' } = options
+  const { limit = 20, offset = 0, status, sortBy = 'createdAt', companyId } = options
 
-  const baseCondition = and(eq(photos.userId, userId), isNull(photos.deletedAt))
-  const whereCondition = status
-    ? and(baseCondition, eq(photos.status, status as Photo['status']))
-    : baseCondition
+  // Build where conditions
+  const conditions = [eq(photos.userId, userId), isNull(photos.deletedAt)]
+
+  if (status) {
+    conditions.push(eq(photos.status, status as Photo['status']))
+  }
+
+  if (companyId) {
+    conditions.push(eq(photos.companyId, companyId))
+  }
+
+  const whereCondition = and(...conditions)
 
   const [photoList, countResult] = await Promise.all([
     db

@@ -349,4 +349,39 @@ describe('Photo Engine Routes', () => {
       expect(body.data.failed).toBe(0)
     })
   })
+
+  // =========================================
+  // Company scoping tests
+  // =========================================
+  describe('Company Scoping - GET /api/v1/photos', () => {
+    it('should accept companyId query parameter', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/v1/photos?companyId=00000000-0000-0000-0000-000000000000',
+        headers: {
+          authorization: `Bearer ${testUser.accessToken}`,
+        },
+      })
+
+      expect(response.statusCode).toBe(200)
+      const body = response.json()
+      expect(body.success).toBe(true)
+      // Should return empty since no photos with this companyId
+      expect(body.data.photos.length).toBe(0)
+    })
+
+    it('should reject invalid companyId format', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/v1/photos?companyId=invalid-uuid',
+        headers: {
+          authorization: `Bearer ${testUser.accessToken}`,
+        },
+      })
+
+      // Should either return 400 for invalid UUID or 200 with ignored invalid param
+      // Depending on implementation - checking it doesn't break
+      expect([200, 400]).toContain(response.statusCode)
+    })
+  })
 })

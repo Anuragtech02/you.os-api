@@ -60,6 +60,11 @@ export async function photoRoutes(fastify: FastifyInstance) {
         return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'File size exceeds 10MB limit', 400)
       }
 
+      // Get companyId from form fields if provided
+      const companyId = data.fields?.companyId
+        ? (data.fields.companyId as { value?: string })?.value
+        : undefined
+
       // Create photo
       const photo = await PhotoService.createPhoto({
         userId: request.user!.id,
@@ -67,6 +72,7 @@ export async function photoRoutes(fastify: FastifyInstance) {
         mimeType: data.mimetype,
         originalFilename: data.filename,
         uploadedFrom: 'api',
+        companyId,
       })
 
       // Return with signed URLs
@@ -99,6 +105,7 @@ export async function photoRoutes(fastify: FastifyInstance) {
         offset: query.offset,
         status: query.status,
         sortBy: query.sortBy,
+        companyId: query.companyId,
       })
 
       // Return with signed URLs

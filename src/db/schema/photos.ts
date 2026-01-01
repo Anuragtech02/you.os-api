@@ -10,6 +10,7 @@ import {
   uuid,
   vector,
 } from 'drizzle-orm/pg-core'
+import { companies } from './companies'
 import { users } from './users'
 
 // Enums
@@ -37,6 +38,7 @@ export const photos = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    companyId: uuid('company_id').references(() => companies.id, { onDelete: 'set null' }),
 
     // Storage
     originalUrl: text('original_url').notNull(),
@@ -70,6 +72,7 @@ export const photos = pgTable(
   },
   (table) => [
     index('idx_photos_user_id').on(table.userId),
+    index('idx_photos_company_id').on(table.companyId),
     index('idx_photos_status').on(table.status),
     index('idx_photos_overall_score').on(table.overallScore),
   ]

@@ -19,6 +19,7 @@ export const listPhotosQuerySchema = z.object({
   offset: z.coerce.number().min(0).default(0),
   status: z.enum(['pending', 'analyzing', 'analyzed', 'enhanced', 'failed']).optional(),
   sortBy: z.enum(['createdAt', 'overallScore']).default('createdAt'),
+  companyId: z.string().uuid().optional(),
 })
 
 // Persona context schema
@@ -46,4 +47,5 @@ export const categoryUpdateSchema = z.object({
 export const uploadSchema = z.object({
   // File validation happens at route level
   uploadedFrom: z.enum(['web', 'mobile', 'api']).default('web'),
+  companyId: z.string().uuid().optional(),
 })

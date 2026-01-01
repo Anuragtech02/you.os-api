@@ -17,6 +17,8 @@ import {
   uuidSchema,
   inviteListSchema,
   transferOwnershipSchema,
+  brandGuidelinesSchema,
+  activityFeedQuerySchema,
 } from './schemas'
 
 export async function companyRoutes(fastify: FastifyInstance) {
@@ -121,6 +123,7 @@ export async function companyRoutes(fastify: FastifyInstance) {
           domain: company.domain,
           logoUrl: company.logoUrl,
           brandColors: company.brandColors,
+          brandGuidelines: company.brandGuidelines,
           settings: company.settings,
           subscriptionTier: company.subscriptionTier,
           subscriptionStatus: company.subscriptionStatus,
@@ -544,6 +547,128 @@ export async function companyRoutes(fastify: FastifyInstance) {
         }
         fastify.log.error(error, 'Resend invite error')
         return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Failed to resend invite', 500)
+      }
+    }
+  )
+
+  // =========================================
+  // Dashboard & Analytics
+  // =========================================
+
+  /**
+   * GET /companies/:id/dashboard-stats - Get dashboard statistics
+   */
+  fastify.get<{ Params: { id: string } }>(
+    '/:id/dashboard-stats',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const idResult = uuidSchema.safeParse(request.params.id)
+      if (!idResult.success) {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid company ID', 400)
+      }
+
+      try {
+        // Only admins/owners can view dashboard stats
+        const canManage = await CompanyService.canUserManageCompany(request.user!.id, idResult.data)
+        if (!canManage) {
+          return sendError(reply, ErrorCodes.FORBIDDEN, 'You do not have permission to view dashboard stats', 403)
+        }
+
+        const stats = await CompanyService.getDashboardStats(idResult.data)
+
+        return sendSuccess(reply, stats)
+      } catch (error) {
+        fastify.log.error(error, 'Get dashboard stats error')
+        return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Failed to get dashboard stats', 500)
+      }
+    }
+  )
+
+  /**
+   * GET /companies/:id/activity - Get activity feed
+   */
+  fastify.get<{ Params: { id: string }; Querystring: Record<string, string> }>(
+    '/:id/activity',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const idResult = uuidSchema.safeParse(request.params.id)
+      if (!idResult.success) {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid company ID', 400)
+      }
+
+      const queryResult = activityFeedQuerySchema.safeParse(request.query)
+      const query = queryResult.success ? queryResult.data : { limit: 20, offset: 0 }
+
+      try {
+        // All members can view activity
+        const isMember = await CompanyService.isUserMemberOfCompany(request.user!.id, idResult.data)
+        if (!isMember) {
+          return sendError(reply, ErrorCodes.FORBIDDEN, 'You do not have access to this company', 403)
+        }
+
+        const { activities, total } = await CompanyService.getActivityFeed(idResult.data, query)
+
+        return sendSuccess(
+          reply,
+          { activities },
+          200,
+          {
+            total,
+            limit: query.limit,
+            offset: query.offset,
+            hasMore: query.offset + activities.length < total,
+          }
+        )
+      } catch (error) {
+        fastify.log.error(error, 'Get activity feed error')
+        return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Failed to get activity feed', 500)
+      }
+    }
+  )
+
+  // =========================================
+  // Brand Guidelines
+  // =========================================
+
+  /**
+   * PATCH /companies/:id/brand-guidelines - Update brand guidelines
+   */
+  fastify.patch<{ Params: { id: string }; Body: unknown }>(
+    '/:id/brand-guidelines',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const idResult = uuidSchema.safeParse(request.params.id)
+      if (!idResult.success) {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid company ID', 400)
+      }
+
+      const bodyResult = brandGuidelinesSchema.safeParse(request.body)
+      if (!bodyResult.success) {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid request body', 400, {
+          errors: bodyResult.error.flatten().fieldErrors,
+        })
+      }
+
+      try {
+        // Only admins/owners can update brand guidelines
+        const canManage = await CompanyService.canUserManageCompany(request.user!.id, idResult.data)
+        if (!canManage) {
+          return sendError(reply, ErrorCodes.FORBIDDEN, 'You do not have permission to update brand guidelines', 403)
+        }
+
+        const company = await CompanyService.updateBrandGuidelines(idResult.data, bodyResult.data)
+
+        return sendSuccess(reply, {
+          id: company.id,
+          brandGuidelines: company.brandGuidelines,
+          updatedAt: company.updatedAt,
+        })
+      } catch (error) {
+        if (error instanceof ApiError) {
+          return sendError(reply, error.code, error.message, error.statusCode)
+        }
+        fastify.log.error(error, 'Update brand guidelines error')
+        return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Failed to update brand guidelines', 500)
       }
     }
   )

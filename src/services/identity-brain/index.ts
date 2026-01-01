@@ -5,7 +5,7 @@
  * that stores user identity data and provides context for all AI modules.
  */
 
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import { db } from '@/db/client'
 import {
   type CoreAttributes,
@@ -16,9 +16,11 @@ import {
   identityBrains,
   personas,
 } from '@/db/schema'
+import { companyCandidates, companyActivities } from '@/db/schema/companies'
 import { Errors } from '@/utils/errors'
 import { createPersonasForBrain } from './personas'
 import { createVersion } from './versions'
+import { logActivity } from '../companies/stats'
 
 /**
  * Get identity brain by user ID
@@ -145,13 +147,62 @@ export async function updateCoreAttributes(
     throw Errors.notFound('Identity brain')
   }
 
+  // Calculate previous completion score
+  const previousScore = calculateCompletionScore(existing.coreAttributes)
+
   // Merge with existing attributes
   const merged: CoreAttributes = {
     ...existing.coreAttributes,
     ...attributes,
   }
 
-  return update(id, { coreAttributes: merged })
+  const updated = await update(id, { coreAttributes: merged })
+
+  // Check if user just crossed 80% completion threshold
+  const newScore = calculateCompletionScore(merged)
+  if (previousScore < 80 && newScore >= 80) {
+    // Log identity completion activity for all companies the user belongs to
+    try {
+      await logIdentityCompletionActivity(existing.userId)
+    } catch (err) {
+      console.error('[IdentityBrain] Failed to log completion activity:', err)
+    }
+  }
+
+  return updated
+}
+
+/**
+ * Log identity completion activity for all companies a user belongs to
+ * Only logs once per user per company
+ */
+async function logIdentityCompletionActivity(userId: string): Promise<void> {
+  // Get all companies the user is a member of
+  const memberships = await db
+    .select({ companyId: companyCandidates.companyId })
+    .from(companyCandidates)
+    .where(eq(companyCandidates.userId, userId))
+
+  for (const { companyId } of memberships) {
+    // Check if we've already logged this activity for this user in this company
+    const [existing] = await db
+      .select({ id: companyActivities.id })
+      .from(companyActivities)
+      .where(
+        and(
+          eq(companyActivities.companyId, companyId),
+          eq(companyActivities.userId, userId),
+          eq(companyActivities.type, 'identity_completed')
+        )
+      )
+      .limit(1)
+
+    if (!existing) {
+      await logActivity(companyId, userId, 'identity_completed', {
+        details: 'User reached 80% identity completion',
+      })
+    }
+  }
 }
 
 /**

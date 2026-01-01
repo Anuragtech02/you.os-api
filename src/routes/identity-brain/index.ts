@@ -12,6 +12,7 @@ import * as PersonaService from '@/services/identity-brain/personas'
 import * as VersionService from '@/services/identity-brain/versions'
 import * as LearningService from '@/services/identity-brain/learning'
 import * as EmbeddingService from '@/services/identity-brain/embeddings'
+import * as CompanyService from '@/services/companies'
 import {
   createIdentityBrainSchema,
   updateIdentityBrainSchema,
@@ -25,6 +26,11 @@ import {
   processFeedbackSchema,
   paginationSchema,
 } from './schemas'
+import { z } from 'zod'
+
+const identityBrainQuerySchema = z.object({
+  companyId: z.string().uuid().optional(),
+})
 
 export async function identityBrainRoutes(fastify: FastifyInstance) {
   // =========================================
@@ -33,11 +39,15 @@ export async function identityBrainRoutes(fastify: FastifyInstance) {
 
   /**
    * GET /identity-brain - Get current user's identity brain
+   * Optional query param: companyId - returns company context with brand guidelines
    */
-  fastify.get(
+  fastify.get<{ Querystring: { companyId?: string } }>(
     '/',
     { preHandler: [fastify.authenticate] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
+      const queryResult = identityBrainQuerySchema.safeParse(request.query)
+      const query = queryResult.success ? queryResult.data : {}
+
       const brain = await IdentityBrainService.getWithPersonas(request.user!.id)
 
       if (!brain) {
@@ -45,6 +55,30 @@ export async function identityBrainRoutes(fastify: FastifyInstance) {
       }
 
       const completion = IdentityBrainService.getCompletionDetails(brain.coreAttributes)
+
+      // If companyId provided, return company context
+      if (query.companyId) {
+        // Verify user is member of company
+        const isMember = await CompanyService.isUserMemberOfCompany(request.user!.id, query.companyId)
+        if (!isMember) {
+          return sendError(reply, ErrorCodes.FORBIDDEN, 'You do not have access to this company', 403)
+        }
+
+        const company = await CompanyService.getCompanyById(query.companyId)
+        if (!company) {
+          return sendError(reply, ErrorCodes.NOT_FOUND, 'Company not found', 404)
+        }
+
+        return sendSuccess(reply, {
+          identityBrain: brain,
+          completion,
+          companyContext: {
+            companyId: company.id,
+            companyName: company.name,
+            brandGuidelines: company.brandGuidelines,
+          },
+        })
+      }
 
       return sendSuccess(reply, {
         identityBrain: brain,
