@@ -565,6 +565,103 @@ describe('Company Routes', () => {
   })
 
   // =========================================
+  // GET /companies/:id/photos - Company photos
+  // =========================================
+  describe('GET /api/v1/companies/:id/photos', () => {
+    it('should require authentication', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/companies/${testCompanyId}/photos`,
+      })
+
+      expect(response.statusCode).toBe(401)
+    })
+
+    it('should return photos for company member', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/companies/${testCompanyId}/photos`,
+        headers: {
+          authorization: `Bearer ${testUser.accessToken}`,
+        },
+      })
+
+      expect(response.statusCode).toBe(200)
+      const body = response.json()
+      expect(body.success).toBe(true)
+      expect(Array.isArray(body.data.photos)).toBe(true)
+      expect(body.meta).toBeDefined()
+      expect(body.meta.total).toBeDefined()
+    })
+
+    it('should support pagination', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/companies/${testCompanyId}/photos?limit=5&offset=0`,
+        headers: {
+          authorization: `Bearer ${testUser.accessToken}`,
+        },
+      })
+
+      expect(response.statusCode).toBe(200)
+      const body = response.json()
+      expect(body.data.photos.length).toBeLessThanOrEqual(5)
+    })
+
+    it('should support status filter', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/companies/${testCompanyId}/photos?status=analyzed`,
+        headers: {
+          authorization: `Bearer ${testUser.accessToken}`,
+        },
+      })
+
+      expect(response.statusCode).toBe(200)
+      const body = response.json()
+      expect(body.success).toBe(true)
+    })
+
+    it('should support userId filter to see specific member photos', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/companies/${testCompanyId}/photos?userId=${testUser.userId}`,
+        headers: {
+          authorization: `Bearer ${testUser.accessToken}`,
+        },
+      })
+
+      expect(response.statusCode).toBe(200)
+      const body = response.json()
+      expect(body.success).toBe(true)
+    })
+
+    it('should return 403 for non-member', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/companies/${testCompanyId}/photos`,
+        headers: {
+          authorization: `Bearer ${secondUser.accessToken}`,
+        },
+      })
+
+      expect(response.statusCode).toBe(403)
+    })
+
+    it('should return 400 for invalid company ID', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/v1/companies/invalid-id/photos',
+        headers: {
+          authorization: `Bearer ${testUser.accessToken}`,
+        },
+      })
+
+      expect(response.statusCode).toBe(400)
+    })
+  })
+
+  // =========================================
   // DELETE /companies/:id - Delete company
   // =========================================
   describe('DELETE /api/v1/companies/:id', () => {

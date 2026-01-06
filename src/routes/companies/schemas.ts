@@ -86,3 +86,12 @@ export const activityFeedQuerySchema = z.object({
   offset: z.coerce.number().min(0).default(0),
   type: activityTypeSchema.optional(),
 })
+
+// Company photos query schema
+export const companyPhotosQuerySchema = z.object({
+  limit: z.coerce.number().min(1).max(100).default(20),
+  offset: z.coerce.number().min(0).default(0),
+  status: z.enum(['pending', 'analyzing', 'analyzed', 'enhanced', 'failed']).optional(),
+  sortBy: z.enum(['createdAt', 'overallScore']).default('createdAt'),
+  userId: z.string().uuid().optional(), // Filter by specific member
+})

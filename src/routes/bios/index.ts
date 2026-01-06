@@ -6,6 +6,7 @@
 
 import type { FastifyInstance } from 'fastify'
 import * as BioService from '@/services/modules/bio-generator'
+import * as BillingService from '@/services/billing'
 import { ApiError } from '@/utils/errors'
 import { ErrorCodes, sendError, sendSuccess } from '@/utils/response'
 import {
@@ -26,7 +27,7 @@ export async function bioRoutes(fastify: FastifyInstance) {
    */
   fastify.post<{ Body: unknown }>(
     '/generate',
-    { preHandler: [fastify.authenticate] },
+    { preHandler: [fastify.authenticate, fastify.checkGenerationLimit('bio')] },
     async (request, reply) => {
       const bodyResult = generateBioSchema.safeParse(request.body)
       if (!bodyResult.success) {
@@ -42,11 +43,15 @@ export async function bioRoutes(fastify: FastifyInstance) {
       try {
         const result = await BioService.generateBio(request.user!.id, bodyResult.data)
 
+        // Record usage after successful generation
+        await BillingService.recordUsage(request.user!.id, 'bio')
+
         return sendSuccess(reply, {
           variations: result.variations,
           platform: result.platform,
           model: result.model,
           generationId: result.generationId,
+          billing: request.billingContext,
         }, 201)
       } catch (error) {
         if (error instanceof ApiError) {
@@ -63,7 +68,7 @@ export async function bioRoutes(fastify: FastifyInstance) {
    */
   fastify.post<{ Body: unknown }>(
     '/dating-prompt',
-    { preHandler: [fastify.authenticate] },
+    { preHandler: [fastify.authenticate, fastify.checkGenerationLimit('dating_prompt')] },
     async (request, reply) => {
       const bodyResult = generateDatingPromptSchema.safeParse(request.body)
       if (!bodyResult.success) {
@@ -79,11 +84,15 @@ export async function bioRoutes(fastify: FastifyInstance) {
       try {
         const result = await BioService.generateDatingPromptAnswer(request.user!.id, bodyResult.data)
 
+        // Record usage after successful generation
+        await BillingService.recordUsage(request.user!.id, 'dating_prompt')
+
         return sendSuccess(reply, {
           variations: result.variations,
           platform: result.platform,
           model: result.model,
           generationId: result.generationId,
+          billing: request.billingContext,
         }, 201)
       } catch (error) {
         if (error instanceof ApiError) {
@@ -181,7 +190,7 @@ export async function bioRoutes(fastify: FastifyInstance) {
    */
   fastify.post<{ Params: { id: string }; Body: unknown }>(
     '/:id/regenerate',
-    { preHandler: [fastify.authenticate] },
+    { preHandler: [fastify.authenticate, fastify.checkGenerationLimit('bio')] },
     async (request, reply) => {
       const idResult = bioIdSchema.safeParse(request.params.id)
       if (!idResult.success) {
@@ -206,11 +215,15 @@ export async function bioRoutes(fastify: FastifyInstance) {
           bodyResult.data.feedback
         )
 
+        // Record usage after successful generation
+        await BillingService.recordUsage(request.user!.id, 'bio')
+
         return sendSuccess(reply, {
           variations: result.variations,
           platform: result.platform,
           model: result.model,
           generationId: result.generationId,
+          billing: request.billingContext,
         }, 201)
       } catch (error) {
         if (error instanceof ApiError) {

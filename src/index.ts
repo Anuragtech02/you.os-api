@@ -1,7 +1,8 @@
 import Fastify from 'fastify'
 import multipart from '@fastify/multipart'
+import rawBody from 'fastify-raw-body'
 import { env } from '@/config/env'
-import { authPlugin, corsPlugin, rateLimitPlugin } from '@/plugins'
+import { authPlugin, billingPlugin, corsPlugin, rateLimitPlugin } from '@/plugins'
 import { registerRoutes } from '@/routes'
 import { logger } from '@/utils'
 
@@ -31,12 +32,21 @@ async function registerPlugins() {
   await fastify.register(corsPlugin)
   await fastify.register(rateLimitPlugin)
   await fastify.register(authPlugin)
+  await fastify.register(billingPlugin)
   // Multipart for file uploads (10MB limit)
   await fastify.register(multipart, {
     limits: {
       fileSize: 10 * 1024 * 1024, // 10MB
       files: 1,
     },
+  })
+  // Raw body support for Stripe webhooks
+  await fastify.register(rawBody, {
+    field: 'rawBody',
+    global: false, // Only on routes that need it
+    encoding: false, // Keep as Buffer
+    runFirst: true,
+    routes: ['/api/v1/billing/webhook'],
   })
 }
 

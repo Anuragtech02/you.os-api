@@ -300,6 +300,34 @@ This document tracks the implementation of multi-tenant improvements requested b
 
 ---
 
+## Phase 6: Company Photos Endpoint (Added)
+
+### 6.1 Company-Wide Photos Listing
+- **Status:** [x] Completed
+- **Problem:** Company owners/admins couldn't see photos uploaded by all company members - only their own photos.
+- **Solution:** Added `GET /companies/:id/photos` endpoint that returns all photos uploaded to the company.
+- **Files modified:**
+  - `src/services/photos/index.ts` - Added `listByCompany()` method
+  - `src/routes/companies/index.ts` - Added `/photos` endpoint
+  - `src/routes/companies/schemas.ts` - Added `companyPhotosQuerySchema`
+  - `tests/routes/companies.test.ts` - Added company photos tests
+- **Query Parameters:**
+  - `limit` - Pagination limit (default: 20, max: 100)
+  - `offset` - Pagination offset (default: 0)
+  - `status` - Filter by photo status (pending, analyzing, analyzed, enhanced, failed)
+  - `sortBy` - Sort by createdAt or overallScore (default: createdAt)
+  - `userId` - Optional filter by specific member's photos
+- **Authorization:**
+  - All company members can view company photos
+  - Non-members get 403 Forbidden
+- **Acceptance Criteria:**
+  - [x] Returns all photos uploaded to the company (from all members)
+  - [x] Supports pagination and filtering
+  - [x] Only accessible by company members
+  - [x] Returns signed URLs for photos
+
+---
+
 ## Notes
 
 - All schema changes require migrations

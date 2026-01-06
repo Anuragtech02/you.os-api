@@ -165,6 +165,55 @@ export async function listByUser(
 }
 
 /**
+ * List all photos for a company (all members' photos)
+ * Used by company owners/admins to see all photos uploaded to the company
+ */
+export async function listByCompany(
+  companyId: string,
+  options: {
+    limit?: number
+    offset?: number
+    status?: string
+    sortBy?: 'createdAt' | 'overallScore'
+    userId?: string // Optional filter by specific user
+  } = {}
+): Promise<{ photos: Photo[]; total: number }> {
+  const { limit = 20, offset = 0, status, sortBy = 'createdAt', userId } = options
+
+  // Build where conditions - filter by company, not user
+  const conditions = [eq(photos.companyId, companyId), isNull(photos.deletedAt)]
+
+  if (status) {
+    conditions.push(eq(photos.status, status as Photo['status']))
+  }
+
+  if (userId) {
+    conditions.push(eq(photos.userId, userId))
+  }
+
+  const whereCondition = and(...conditions)
+
+  const [photoList, countResult] = await Promise.all([
+    db
+      .select()
+      .from(photos)
+      .where(whereCondition)
+      .orderBy(sortBy === 'overallScore' ? desc(photos.overallScore) : desc(photos.createdAt))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(photos)
+      .where(whereCondition),
+  ])
+
+  return {
+    photos: photoList,
+    total: Number(countResult[0]?.count ?? 0),
+  }
+}
+
+/**
  * Soft delete a photo
  */
 export async function deletePhoto(photoId: string, userId: string): Promise<void> {

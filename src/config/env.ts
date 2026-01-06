@@ -36,6 +36,11 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default('YOU.OS <noreply@youos.app>'),
   FRONTEND_URL: z.string().url().default('https://youos.app'),
+
+  // Stripe
+  STRIPE_SECRET_KEY: z.string().min(1),
+  STRIPE_WEBHOOK_SECRET: z.string().min(1),
+  STRIPE_PUBLISHABLE_KEY: z.string().min(1),
 })
 
 export type Env = z.infer<typeof envSchema>

@@ -2,6 +2,7 @@
  * Company Routes
  *
  * API endpoints for company management, employees, and invites.
+ * Note: Company features require Elite plan subscription.
  */
 
 import type { FastifyInstance } from 'fastify'
@@ -19,7 +20,9 @@ import {
   transferOwnershipSchema,
   brandGuidelinesSchema,
   activityFeedQuerySchema,
+  companyPhotosQuerySchema,
 } from './schemas'
+import * as PhotoService from '@/services/photos'
 
 export async function companyRoutes(fastify: FastifyInstance) {
   // =========================================
@@ -28,10 +31,11 @@ export async function companyRoutes(fastify: FastifyInstance) {
 
   /**
    * POST /companies - Create a new company
+   * Requires Elite plan subscription
    */
   fastify.post<{ Body: unknown }>(
     '/',
-    { preHandler: [fastify.authenticate] },
+    { preHandler: [fastify.authenticate, fastify.checkCompanyAccess()] },
     async (request, reply) => {
       const bodyResult = createCompanySchema.safeParse(request.body)
       if (!bodyResult.success) {
@@ -669,6 +673,65 @@ export async function companyRoutes(fastify: FastifyInstance) {
         }
         fastify.log.error(error, 'Update brand guidelines error')
         return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Failed to update brand guidelines', 500)
+      }
+    }
+  )
+
+  // =========================================
+  // Company Photos
+  // =========================================
+
+  /**
+   * GET /companies/:id/photos - List all photos uploaded to this company
+   * Returns photos from ALL members, not just the requesting user.
+   * Only company members can view company photos.
+   */
+  fastify.get<{ Params: { id: string }; Querystring: Record<string, string> }>(
+    '/:id/photos',
+    { preHandler: [fastify.authenticate] },
+    async (request, reply) => {
+      const idResult = uuidSchema.safeParse(request.params.id)
+      if (!idResult.success) {
+        return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Invalid company ID', 400)
+      }
+
+      const queryResult = companyPhotosQuerySchema.safeParse(request.query)
+      const query = queryResult.success
+        ? queryResult.data
+        : { limit: 20, offset: 0, sortBy: 'createdAt' as const }
+
+      try {
+        // All company members can view company photos
+        const isMember = await CompanyService.isUserMemberOfCompany(request.user!.id, idResult.data)
+        if (!isMember) {
+          return sendError(reply, ErrorCodes.FORBIDDEN, 'You do not have access to this company', 403)
+        }
+
+        const { photos, total } = await PhotoService.listByCompany(idResult.data, {
+          limit: query.limit,
+          offset: query.offset,
+          status: query.status,
+          sortBy: query.sortBy,
+          userId: query.userId,
+        })
+
+        // Return with signed URLs
+        const photosWithUrls = await PhotoService.withSignedUrlsBatch(photos)
+
+        return sendSuccess(
+          reply,
+          { photos: photosWithUrls },
+          200,
+          {
+            total,
+            limit: query.limit,
+            offset: query.offset,
+            hasMore: query.offset + photos.length < total,
+          }
+        )
+      } catch (error) {
+        fastify.log.error(error, 'List company photos error')
+        return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Failed to list company photos', 500)
       }
     }
   )

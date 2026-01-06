@@ -3,6 +3,7 @@ import { API_PREFIX } from '@/config/constants'
 import { adminRoutes } from './admin'
 import { aestheticRoutes } from './aesthetic'
 import { authRoutes } from './auth'
+import billingRoutes from './billing'
 import { bioRoutes } from './bios'
 import { careerRoutes } from './career'
 import { companyRoutes, inviteRoutes } from './companies'
@@ -51,6 +52,9 @@ export async function registerRoutes(fastify: FastifyInstance) {
 
       // Admin routes (Super Admin only)
       await api.register(adminRoutes, { prefix: '/admin' })
+
+      // Billing routes
+      await api.register(billingRoutes, { prefix: '/billing' })
 
       // Placeholder route
       api.get('/', async () => ({
