@@ -11,6 +11,11 @@ export const SUBSCRIPTION_PLANS = {
     stripePriceIdMonthly: null,
     stripePriceIdYearly: null,
     trialDays: 0,
+    // Service-level config
+    deliveryHours: null, // No delivery guarantee
+    revisionCount: 0,
+    scope: 'none' as const,
+    queuePriority: 'none' as const,
     features: {
       generationsPerMonth: 10,
       contexts: 1, // Only one context (LinkedIn OR Dating OR Bio)
@@ -33,6 +38,11 @@ export const SUBSCRIPTION_PLANS = {
     stripePriceIdMonthly: env.STRIPE_PRICE_PRO_MONTHLY || null,
     stripePriceIdYearly: env.STRIPE_PRICE_PRO_YEARLY || null,
     trialDays: 7,
+    // Service-level config (Identity Consistency Engine)
+    deliveryHours: 48,
+    revisionCount: 1,
+    scope: 'base' as const, // LinkedIn + Website + Single Source of Truth
+    queuePriority: 'standard' as const,
     features: {
       generationsPerMonth: 300,
       contexts: -1, // Unlimited within same module
@@ -55,6 +65,11 @@ export const SUBSCRIPTION_PLANS = {
     stripePriceIdMonthly: env.STRIPE_PRICE_ELITE_MONTHLY || null,
     stripePriceIdYearly: env.STRIPE_PRICE_ELITE_YEARLY || null,
     trialDays: 0, // No trial for Elite (premium positioning)
+    // Service-level config (Identity Consistency Engine)
+    deliveryHours: 24, // Priority queue
+    revisionCount: 3, // 2-3 async revisions
+    scope: 'base_plus_pitch' as const, // Base + Pitch narrative spine + conversion tightening
+    queuePriority: 'priority' as const,
     features: {
       generationsPerMonth: -1, // Unlimited (fair use)
       contexts: -1, // Unlimited
