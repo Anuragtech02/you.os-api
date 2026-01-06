@@ -1,3 +1,5 @@
+import { env } from './env'
+
 // Subscription Plans
 export const SUBSCRIPTION_PLANS = {
   free: {
@@ -28,8 +30,8 @@ export const SUBSCRIPTION_PLANS = {
     description: 'Advanced features for individuals',
     monthlyPrice: 2900, // $29 in cents
     yearlyPrice: 24900, // $249 in cents
-    stripePriceIdMonthly: 'price_1SmGXJAAWsLUgbZIvMGXfKk', // Provided by client
-    stripePriceIdYearly: null, // To be created in Stripe
+    stripePriceIdMonthly: env.STRIPE_PRICE_PRO_MONTHLY || null,
+    stripePriceIdYearly: env.STRIPE_PRICE_PRO_YEARLY || null,
     trialDays: 7,
     features: {
       generationsPerMonth: 300,
@@ -50,8 +52,8 @@ export const SUBSCRIPTION_PLANS = {
     description: 'Full access with company features',
     monthlyPrice: 9900, // $99 in cents
     yearlyPrice: 99900, // $999 in cents
-    stripePriceIdMonthly: null, // To be created in Stripe
-    stripePriceIdYearly: null, // To be created in Stripe
+    stripePriceIdMonthly: env.STRIPE_PRICE_ELITE_MONTHLY || null,
+    stripePriceIdYearly: env.STRIPE_PRICE_ELITE_YEARLY || null,
     trialDays: 0, // No trial for Elite (premium positioning)
     features: {
       generationsPerMonth: -1, // Unlimited (fair use)

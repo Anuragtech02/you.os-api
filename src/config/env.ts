@@ -41,6 +41,12 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_PUBLISHABLE_KEY: z.string().optional(),
+
+  // Stripe Price IDs (optional - create in Stripe Dashboard)
+  STRIPE_PRICE_PRO_MONTHLY: z.string().optional(),
+  STRIPE_PRICE_PRO_YEARLY: z.string().optional(),
+  STRIPE_PRICE_ELITE_MONTHLY: z.string().optional(),
+  STRIPE_PRICE_ELITE_YEARLY: z.string().optional(),
 })
 
 export type Env = z.infer<typeof envSchema>
