@@ -60,6 +60,9 @@ export const ErrorCodes = {
   INTERNAL_ERROR: 'INTERNAL_ERROR',
   AI_SERVICE_ERROR: 'AI_SERVICE_ERROR',
   DATABASE_ERROR: 'DATABASE_ERROR',
+
+  // 503 Service Unavailable
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
 } as const
 
 // Send success response

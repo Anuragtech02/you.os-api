@@ -3,11 +3,22 @@ import { sendSuccess, sendError, ErrorCodes } from '../../utils/response'
 import { checkoutSchema, cancelSchema, contextSchema } from './schemas'
 import * as BillingService from '../../services/billing'
 import { handleWebhookEvent } from '../../services/billing/webhooks'
-import { stripe } from '../../services/billing/stripe'
+import { stripe, isStripeConfigured } from '../../services/billing/stripe'
 import { SUBSCRIPTION_PLANS } from '../../config/billing'
 import { env } from '../../config/env'
 
 export default async function billingRoutes(fastify: FastifyInstance) {
+  // Middleware to check if Stripe is configured
+  const requireStripe = async (_request: FastifyRequest, reply: FastifyReply) => {
+    if (!isStripeConfigured) {
+      return sendError(
+        reply,
+        ErrorCodes.SERVICE_UNAVAILABLE,
+        'Billing is not configured. Please set STRIPE_SECRET_KEY.',
+        503
+      )
+    }
+  }
   // ============================================================================
   // Public Endpoints
   // ============================================================================
@@ -36,7 +47,8 @@ export default async function billingRoutes(fastify: FastifyInstance) {
    */
   fastify.get('/config', async (_request: FastifyRequest, reply: FastifyReply) => {
     return sendSuccess(reply, {
-      publishableKey: env.STRIPE_PUBLISHABLE_KEY,
+      publishableKey: env.STRIPE_PUBLISHABLE_KEY || null,
+      configured: isStripeConfigured,
     })
   })
 
@@ -117,7 +129,7 @@ export default async function billingRoutes(fastify: FastifyInstance) {
    */
   fastify.post(
     '/checkout',
-    { preHandler: [fastify.authenticate] },
+    { preHandler: [fastify.authenticate, requireStripe] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const userId = request.user!.id
 
@@ -149,7 +161,7 @@ export default async function billingRoutes(fastify: FastifyInstance) {
    */
   fastify.post(
     '/portal',
-    { preHandler: [fastify.authenticate] },
+    { preHandler: [fastify.authenticate, requireStripe] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const userId = request.user!.id
 
@@ -165,7 +177,7 @@ export default async function billingRoutes(fastify: FastifyInstance) {
    */
   fastify.post(
     '/cancel',
-    { preHandler: [fastify.authenticate] },
+    { preHandler: [fastify.authenticate, requireStripe] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const userId = request.user!.id
 
@@ -207,7 +219,7 @@ export default async function billingRoutes(fastify: FastifyInstance) {
    */
   fastify.post(
     '/resume',
-    { preHandler: [fastify.authenticate] },
+    { preHandler: [fastify.authenticate, requireStripe] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const userId = request.user!.id
 
@@ -322,6 +334,7 @@ export default async function billingRoutes(fastify: FastifyInstance) {
       config: {
         rawBody: true, // Needed for signature verification
       },
+      preHandler: [requireStripe],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const sig = request.headers['stripe-signature']
@@ -339,7 +352,7 @@ export default async function billingRoutes(fastify: FastifyInstance) {
           return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Missing raw body', 400)
         }
 
-        event = stripe.webhooks.constructEvent(rawBody, sig, env.STRIPE_WEBHOOK_SECRET)
+        event = stripe.webhooks.constructEvent(rawBody, sig, env.STRIPE_WEBHOOK_SECRET!)
       } catch (err) {
         console.error('Webhook signature verification failed:', err)
         return sendError(reply, ErrorCodes.UNAUTHORIZED, 'Invalid signature', 401)
