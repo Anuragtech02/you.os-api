@@ -34,8 +34,11 @@ const envSchema = z.object({
 
   // Email (Resend)
   RESEND_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().default('YOU.OS <noreply@youos.app>'),
-  FRONTEND_URL: z.string().url().default('https://youos.app'),
+  EMAIL_FROM: z.string().default('YOU.OS <noreply@youos.ca>'),
+  EMAIL_SUPPORT: z.string().default('support@youos.ca'),
+  EMAIL_SECURITY: z.string().default('security@youos.ca'),
+  EMAIL_BILLING: z.string().default('billing@youos.ca'),
+  FRONTEND_URL: z.string().url().default('https://youos.ca'),
 
   // Stripe (optional - billing features disabled if not set)
   STRIPE_SECRET_KEY: z.string().optional(),
