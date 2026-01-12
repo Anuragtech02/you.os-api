@@ -25,6 +25,7 @@ const fastify = Fastify({
   trustProxy: true,
   requestIdHeader: 'x-request-id',
   requestIdLogLabel: 'requestId',
+  disableRequestLogging: true, // We'll handle request logging manually
 })
 
 // Register plugins
@@ -51,16 +52,27 @@ async function registerPlugins() {
   })
 }
 
-// Disable logging for health check endpoints to reduce noise
+// Custom request logging - skip health checks
 fastify.addHook('onRequest', (request, _reply, done) => {
+  // Skip logging for health check endpoints
   if (request.url === '/health' || request.url.startsWith('/health')) {
-    request.log = {
-      ...request.log,
-      info: () => {},
-      debug: () => {},
-      trace: () => {},
-    } as typeof request.log
+    done()
+    return
   }
+  request.log.info({ req: request }, 'incoming request')
+  done()
+})
+
+fastify.addHook('onResponse', (request, reply, done) => {
+  // Skip logging for health check endpoints
+  if (request.url === '/health' || request.url.startsWith('/health')) {
+    done()
+    return
+  }
+  request.log.info(
+    { res: reply, responseTime: reply.elapsedTime },
+    'request completed'
+  )
   done()
 })
 
