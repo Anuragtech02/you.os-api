@@ -352,7 +352,7 @@ export default async function billingRoutes(fastify: FastifyInstance) {
           return sendError(reply, ErrorCodes.VALIDATION_ERROR, 'Missing raw body', 400)
         }
 
-        event = stripe.webhooks.constructEvent(rawBody, sig, env.STRIPE_WEBHOOK_SECRET!)
+        event = await stripe.webhooks.constructEventAsync(rawBody, sig, env.STRIPE_WEBHOOK_SECRET!)
       } catch (err) {
         console.error('Webhook signature verification failed:', err)
         return sendError(reply, ErrorCodes.UNAUTHORIZED, 'Invalid signature', 401)
