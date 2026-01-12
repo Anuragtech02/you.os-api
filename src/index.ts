@@ -47,6 +47,7 @@ async function registerPlugins() {
     global: false, // Only on routes that need it
     encoding: false, // Keep as Buffer
     runFirst: true,
+    jsonContentTypes: [], // Don't override JSON parser globally - only for rawBody routes
   })
 }
 
