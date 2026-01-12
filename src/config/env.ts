@@ -5,6 +5,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(3000),
   HOST: z.string().default('0.0.0.0'),
+  LOG_HEALTH_CHECKS: z.coerce.boolean().default(false), // Enable to log /health requests
 
   // Supabase
   SUPABASE_URL: z.string().url(),

@@ -52,10 +52,11 @@ async function registerPlugins() {
   })
 }
 
-// Custom request logging - skip health checks
+// Custom request logging - skip health checks unless LOG_HEALTH_CHECKS=true
+const isHealthCheck = (url: string) => url === '/health' || url.startsWith('/health')
+
 fastify.addHook('onRequest', (request, _reply, done) => {
-  // Skip logging for health check endpoints
-  if (request.url === '/health' || request.url.startsWith('/health')) {
+  if (!env.LOG_HEALTH_CHECKS && isHealthCheck(request.url)) {
     done()
     return
   }
@@ -64,8 +65,7 @@ fastify.addHook('onRequest', (request, _reply, done) => {
 })
 
 fastify.addHook('onResponse', (request, reply, done) => {
-  // Skip logging for health check endpoints
-  if (request.url === '/health' || request.url.startsWith('/health')) {
+  if (!env.LOG_HEALTH_CHECKS && isHealthCheck(request.url)) {
     done()
     return
   }
