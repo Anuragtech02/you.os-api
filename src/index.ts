@@ -41,12 +41,12 @@ async function registerPlugins() {
     },
   })
   // Raw body support for Stripe webhooks
+  // Routes opt-in via config: { rawBody: true } in route definition
   await fastify.register(rawBody, {
     field: 'rawBody',
     global: false, // Only on routes that need it
     encoding: false, // Keep as Buffer
     runFirst: true,
-    routes: ['/api/v1/billing/webhook'],
   })
 }
 
