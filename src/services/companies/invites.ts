@@ -196,6 +196,17 @@ export async function acceptInvite(
     joinedAt: new Date(),
   })
 
+  // If role is owner or admin, update user's accountType to 'company'
+  if (invite.role === 'owner' || invite.role === 'admin') {
+    await db
+      .update(users)
+      .set({
+        accountType: 'company',
+        companyId: invite.companyId,
+      })
+      .where(eq(users.id, userId))
+  }
+
   // Mark invite as accepted
   const [acceptedInvite] = await db
     .update(companyInvites)

@@ -8,6 +8,7 @@ import * as StorageService from '@/services/photos/storage'
 import { ErrorCodes, sendError, sendSuccess } from '@/utils/response'
 import { changePasswordSchema, loginSchema, registerSchema, updateProfileSchema } from './schemas'
 import * as InviteService from '@/services/admin/invites'
+import * as CompanyInviteService from '@/services/companies/invites'
 
 // Create Supabase client for auth operations
 const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
@@ -28,8 +29,28 @@ export async function authRoutes(fastify: FastifyInstance) {
     const { email, password, fullName, inviteToken } = parseResult.data
 
     try {
-      // Check if invite-only mode is enabled
-      if (InviteService.isInviteOnlyEnabled()) {
+      // Check if token is a company invite
+      let companyInvite: Awaited<ReturnType<typeof CompanyInviteService.getInviteByToken>> = null
+      let isCompanyInvite = false
+
+      if (inviteToken) {
+        companyInvite = await CompanyInviteService.getInviteByToken(inviteToken)
+        if (companyInvite && companyInvite.status === 'pending' && new Date() < companyInvite.expiresAt) {
+          isCompanyInvite = true
+          // Verify email matches invite
+          if (companyInvite.email.toLowerCase() !== email.toLowerCase()) {
+            return sendError(
+              reply,
+              ErrorCodes.FORBIDDEN,
+              'This invite was sent to a different email address',
+              403
+            )
+          }
+        }
+      }
+
+      // Check if invite-only mode is enabled (skip check if valid company invite)
+      if (InviteService.isInviteOnlyEnabled() && !isCompanyInvite) {
         if (!inviteToken) {
           return sendError(
             reply,
@@ -39,7 +60,7 @@ export async function authRoutes(fastify: FastifyInstance) {
           )
         }
 
-        // Validate invite token
+        // Validate admin invite token
         const validation = await InviteService.validateInviteToken(inviteToken, email)
         if (!validation.valid) {
           return sendError(reply, ErrorCodes.FORBIDDEN, validation.error || 'Invalid invite token', 403)
@@ -80,9 +101,34 @@ export async function authRoutes(fastify: FastifyInstance) {
         return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Failed to create account', 500)
       }
 
-      // Mark invite token as used (if applicable)
-      if (inviteToken && InviteService.isInviteOnlyEnabled()) {
+      // Mark admin invite token as used (if applicable)
+      if (inviteToken && InviteService.isInviteOnlyEnabled() && !isCompanyInvite) {
         await InviteService.useInviteToken(inviteToken)
+      }
+
+      // Auto-accept company invite if registering with company invite token
+      let companyInfo: { companyId: string; role: string } | null = null
+      if (isCompanyInvite && companyInvite) {
+        try {
+          const { companyId } = await CompanyInviteService.acceptInvite(inviteToken!, newUser.id)
+          companyInfo = { companyId, role: companyInvite.role }
+
+          // If role is owner or admin, update user's accountType to 'company'
+          if (companyInvite.role === 'owner' || companyInvite.role === 'admin') {
+            await db
+              .update(users)
+              .set({
+                accountType: 'company',
+                companyId,
+              })
+              .where(eq(users.id, newUser.id))
+            newUser.accountType = 'company'
+            newUser.companyId = companyId
+          }
+        } catch (err) {
+          fastify.log.error(err, 'Failed to auto-accept company invite')
+          // Don't fail registration, user can accept manually later
+        }
       }
 
       // Sign in the user to get tokens
@@ -101,7 +147,9 @@ export async function authRoutes(fastify: FastifyInstance) {
               email: newUser.email,
               fullName: newUser.fullName,
               accountType: newUser.accountType,
+              companyId: newUser.companyId,
             },
+            company: companyInfo,
             message: 'Account created. Please sign in.',
           },
           201
@@ -116,7 +164,9 @@ export async function authRoutes(fastify: FastifyInstance) {
             email: newUser.email,
             fullName: newUser.fullName,
             accountType: newUser.accountType,
+            companyId: newUser.companyId,
           },
+          company: companyInfo,
           session: {
             accessToken: session.session.access_token,
             refreshToken: session.session.refresh_token,

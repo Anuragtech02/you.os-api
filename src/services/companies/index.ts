@@ -11,6 +11,7 @@ import {
   type Company,
   type BrandGuidelines,
 } from '@/db/schema/companies'
+import { users } from '@/db/schema/users'
 import { eq, and } from 'drizzle-orm'
 import { ApiError } from '@/utils/errors'
 
@@ -59,6 +60,15 @@ export async function createCompany(
     role: 'admin',
     joinedAt: new Date(),
   })
+
+  // Update owner's account type and company association
+  await db
+    .update(users)
+    .set({
+      accountType: 'company',
+      companyId: company!.id,
+    })
+    .where(eq(users.id, ownerId))
 
   return company!
 }
