@@ -331,9 +331,6 @@ export default async function billingRoutes(fastify: FastifyInstance) {
   fastify.post(
     '/webhook',
     {
-      config: {
-        rawBody: true, // Needed for signature verification
-      },
       preHandler: [requireStripe],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {

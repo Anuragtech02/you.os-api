@@ -1,6 +1,5 @@
 import Fastify from 'fastify'
 import multipart from '@fastify/multipart'
-import rawBody from 'fastify-raw-body'
 import { env } from '@/config/env'
 import { authPlugin, billingPlugin, corsPlugin, rateLimitPlugin } from '@/plugins'
 import { registerRoutes } from '@/routes'
@@ -41,15 +40,22 @@ async function registerPlugins() {
       files: 1,
     },
   })
-  // Raw body support for Stripe webhooks
-  // Routes opt-in via config: { rawBody: true } in route definition
-  await fastify.register(rawBody, {
-    field: 'rawBody',
-    global: false, // Only on routes that need it
-    encoding: false, // Keep as Buffer
-    runFirst: true,
-    jsonContentTypes: [], // Don't override JSON parser globally - only for rawBody routes
-  })
+  // Custom content type parser for Stripe webhooks (raw body as Buffer)
+  // This captures the raw body for signature verification
+  fastify.addContentTypeParser(
+    'application/json',
+    { parseAs: 'buffer' },
+    (req, body, done) => {
+      // Store raw body for webhook signature verification
+      ;(req as typeof req & { rawBody: Buffer }).rawBody = body as Buffer
+      try {
+        const json = JSON.parse(body.toString())
+        done(null, json)
+      } catch (err) {
+        done(err as Error, undefined)
+      }
+    }
+  )
 }
 
 // Custom request logging - skip health checks unless LOG_HEALTH_CHECKS=true
