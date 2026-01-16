@@ -49,7 +49,13 @@ async function registerPlugins() {
       // Store raw body for webhook signature verification
       ;(req as typeof req & { rawBody: Buffer }).rawBody = body as Buffer
       try {
-        const json = JSON.parse(body.toString())
+        // Handle empty body (e.g., DELETE requests)
+        const bodyStr = body.toString()
+        if (!bodyStr || bodyStr.trim() === '') {
+          done(null, null)
+          return
+        }
+        const json = JSON.parse(bodyStr)
         done(null, json)
       } catch (err) {
         done(err as Error, undefined)
