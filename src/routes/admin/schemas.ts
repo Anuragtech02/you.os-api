@@ -104,8 +104,11 @@ export const updateCompanyEmployeeSchema = z.object({
 // Invite Schemas
 // =========================================
 
+export const inviteTypeSchema = z.enum(['individual', 'company'])
+
 export const createInviteTokenSchema = z.object({
   email: z.string().email().optional(),
+  type: inviteTypeSchema.default('individual'),
   maxUses: z.number().int().min(1).max(1000).default(1),
   expiresInDays: z.number().int().min(1).max(365).default(7),
   note: z.string().max(500).optional(),

@@ -32,6 +32,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       // Check if token is a company invite
       let companyInvite: Awaited<ReturnType<typeof CompanyInviteService.getInviteByToken>> = null
       let isCompanyInvite = false
+      let adminInvite: Awaited<ReturnType<typeof InviteService.validateInviteToken>>['invite'] = undefined
 
       if (inviteToken) {
         companyInvite = await CompanyInviteService.getInviteByToken(inviteToken)
@@ -65,6 +66,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         if (!validation.valid) {
           return sendError(reply, ErrorCodes.FORBIDDEN, validation.error || 'Invalid invite token', 403)
         }
+        adminInvite = validation.invite
       }
 
       // Check if user already exists
@@ -86,6 +88,9 @@ export async function authRoutes(fastify: FastifyInstance) {
         return sendError(reply, ErrorCodes.INTERNAL_ERROR, 'Failed to create account', 500)
       }
 
+      // Determine account type based on invite
+      const accountType = adminInvite?.inviteType === 'company' ? 'company' : 'individual'
+
       // Create user in our database
       const [newUser] = await db
         .insert(users)
@@ -93,6 +98,7 @@ export async function authRoutes(fastify: FastifyInstance) {
           authId: authData.user.id,
           email,
           fullName,
+          accountType,
         })
         .returning()
 
@@ -207,6 +213,7 @@ export async function authRoutes(fastify: FastifyInstance) {
           invite: {
             // Only expose safe information
             restrictedToEmail: invite.email || null,
+            type: invite.inviteType,
             expiresAt: invite.expiresAt,
             remainingUses: parseInt(invite.maxUses, 10) - parseInt(invite.usedCount, 10),
             note: invite.note, // Optional: could hide this for privacy

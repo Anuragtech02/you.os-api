@@ -3,6 +3,7 @@ import { users } from './users'
 
 // Enums
 export const adminRoleEnum = pgEnum('admin_role', ['super_admin', 'admin', 'moderator', 'support'])
+export const inviteTypeEnum = pgEnum('invite_type', ['individual', 'company'])
 export const auditActionEnum = pgEnum('audit_action', [
   'user_created',
   'user_updated',
@@ -130,6 +131,9 @@ export const signupInviteTokens = pgTable(
 
     // Optional: restrict to specific email
     email: text('email'),
+
+    // Invite type: individual or company account
+    inviteType: inviteTypeEnum('invite_type').default('individual').notNull(),
 
     // Usage limits
     maxUses: text('max_uses').default('1').notNull(),

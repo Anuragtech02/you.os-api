@@ -17,13 +17,14 @@ import * as EmailService from '@/services/email'
  */
 export async function createInviteToken(options: {
   email?: string
+  type?: 'individual' | 'company'
   maxUses?: number
   expiresInDays?: number
   note?: string
   createdBy?: string
   sendEmail?: boolean
 }): Promise<SignupInviteToken> {
-  const { email, maxUses = 1, expiresInDays = 7, note, createdBy, sendEmail = true } = options
+  const { email, type = 'individual', maxUses = 1, expiresInDays = 7, note, createdBy, sendEmail = true } = options
 
   // Generate unique token
   const token = nanoid(32)
@@ -37,6 +38,7 @@ export async function createInviteToken(options: {
     .values({
       token,
       email: email || null,
+      inviteType: type,
       maxUses: String(maxUses),
       usedCount: '0',
       expiresAt,

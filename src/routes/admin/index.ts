@@ -902,6 +902,7 @@ export async function adminRoutes(fastify: FastifyInstance) {
 
         const invite = await InviteService.createInviteToken({
           email: bodyResult.data.email,
+          type: bodyResult.data.type,
           maxUses: bodyResult.data.maxUses,
           expiresInDays: bodyResult.data.expiresInDays,
           note: bodyResult.data.note,
@@ -914,6 +915,7 @@ export async function adminRoutes(fastify: FastifyInstance) {
             id: invite.id,
             token: invite.token,
             email: invite.email,
+            type: invite.inviteType,
             maxUses: parseInt(invite.maxUses, 10),
             expiresAt: invite.expiresAt,
             note: invite.note,
